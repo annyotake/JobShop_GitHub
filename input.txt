@@ -3,7 +3,7 @@ job_size /
 
 [job0]
 job_priority release_time delivery_time ope_size /
-1            0            1000          3        
+1            0            50            3        
 
 ope0:
 resource_type worker_size worker_num machine_size machine_num ope_worker_size ope_worker_num  /
@@ -21,7 +21,7 @@ resource_type worker_size worker_num machine_size machine_num ope_worker_size op
 
 [job1]
 job_priority release_time delivery_time ope_size /
-0            100          800           4
+0            0            30            4
 
 ope0:
 resource_type worker_size worker_num /

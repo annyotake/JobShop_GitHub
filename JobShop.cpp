@@ -82,7 +82,7 @@ public:
         int ope_num;
         float sequence;
 
-        bool operator<(const Ope_sequence &another) const
+        bool operator<(Ope_sequence &another)
         {
             return sequence < another.sequence;
         }
@@ -100,67 +100,71 @@ public:
     {
         float F; // objective
         vector<Ope_sequence> ope_sequence;
+        vector<Ope_sequence> sort_sequence;
         vector<vector<Resource_asg>> resource_asg;
 
-        bool operator<(const Chromosome &another) const
+        bool operator<(Chromosome &another)
         {
             return F < another.F;
         }
 
-        Chromosome operator+(const Chromosome &another) const
+        Chromosome operator+(Chromosome &another)
         {
             Chromosome ans;
+            ans.resource_asg.resize(resource_asg.size());
 
             for (int i = 0; i < ope_sequence.size(); i++)
             {
-                ans.ope_sequence[i].sequence = ope_sequence[i].sequence + another.ope_sequence[i].sequence;
+                ans.ope_sequence.push_back({ope_sequence[i].job_num, ope_sequence[i].ope_num, (ope_sequence[i].sequence + another.ope_sequence[i].sequence)});
             }
 
             for (int i = 0; i < resource_asg.size(); i++)
             {
                 for (int j = 0; j < resource_asg[i].size(); j++)
                 {
-                    ans.resource_asg[i][j].assignment = resource_asg[i][j].assignment + another.resource_asg[i][j].assignment;
+                    ans.resource_asg[i].push_back({(resource_asg[i][j].assignment + another.resource_asg[i][j].assignment), resource_asg[i][j].assign_pattern, -1, -1});
                 }
             }
 
             return ans;
         }
 
-        Chromosome operator-(const Chromosome &another) const
+        Chromosome operator-(Chromosome &another)
         {
             Chromosome ans;
+            ans.resource_asg.resize(resource_asg.size());
 
             for (int i = 0; i < ope_sequence.size(); i++)
             {
-                ans.ope_sequence[i].sequence = ope_sequence[i].sequence - another.ope_sequence[i].sequence;
+                ans.ope_sequence.push_back({ope_sequence[i].job_num, ope_sequence[i].ope_num, (ope_sequence[i].sequence - another.ope_sequence[i].sequence)});
             }
 
             for (int i = 0; i < resource_asg.size(); i++)
             {
                 for (int j = 0; j < resource_asg[i].size(); j++)
                 {
-                    ans.resource_asg[i][j].assignment = resource_asg[i][j].assignment - another.resource_asg[i][j].assignment;
+                    ans.resource_asg[i].push_back({(resource_asg[i][j].assignment - another.resource_asg[i][j].assignment), resource_asg[i][j].assign_pattern, -1, -1});
                 }
             }
 
             return ans;
         }
 
-        Chromosome operator*(const float x) const
+        Chromosome operator*(float x)
         {
             Chromosome ans;
+            ans.resource_asg.resize(resource_asg.size());
 
             for (int i = 0; i < ope_sequence.size(); i++)
             {
-                ans.ope_sequence[i].sequence = ope_sequence[i].sequence * x;
+                ans.ope_sequence.push_back({ope_sequence[i].job_num, ope_sequence[i].ope_num, (ope_sequence[i].sequence * x)});
             }
 
             for (int i = 0; i < resource_asg.size(); i++)
             {
                 for (int j = 0; j < resource_asg[i].size(); j++)
                 {
-                    ans.resource_asg[i][j].assignment = resource_asg[i][j].assignment * x;
+                    ans.resource_asg[i].push_back({(resource_asg[i][j].assignment * x), resource_asg[i][j].assign_pattern, -1, -1});
                 }
             }
 
@@ -185,8 +189,11 @@ public:
 
     vector<Ope_sequence> ope_sequence; // original
     vector<Ope_sequence> ope_x0;       // random
+    vector<Ope_sequence> sort_ope_x0;  // random(sorted)
     vector<Ope_sequence> ope_x1;       // greedy1
+    vector<Ope_sequence> sort_ope_x1;  // greedy1(sorted)
     vector<Ope_sequence> ope_x2;       // greedy2
+    vector<Ope_sequence> sort_ope_x2;  // greedy2(sorted)
 
     vector<vector<Resource_asg>> resource_asg; // original
     vector<vector<Resource_asg>> resource_x0;  // random
@@ -513,7 +520,8 @@ void JobShop::init_ope_sequence()
         ope_sequence[i].sequence = get_rand(0.0, 1.0);
     }
 
-    ope_x0 = sort_ope_sequence(ope_sequence);
+    ope_x0 = ope_sequence;
+    sort_ope_x0 = sort_ope_sequence(ope_sequence);
 
     // generate x1(greedy1)
     int order = max_element(begin(job), end(job), [](const Job &job1, const Job &job2)
@@ -532,7 +540,8 @@ void JobShop::init_ope_sequence()
         }
     }
 
-    ope_x1 = sort_ope_sequence(ope_sequence);
+    ope_x1 = ope_sequence;
+    sort_ope_x1 = sort_ope_sequence(ope_sequence);
 
     // generate x2(greedy2)
     for (int i = 0; i < seq_size; i++)
@@ -547,7 +556,8 @@ void JobShop::init_ope_sequence()
         }
     }
 
-    ope_x2 = sort_ope_sequence(ope_sequence);
+    ope_x2 = ope_sequence;
+    sort_ope_x2 = sort_ope_sequence(ope_sequence);
 }
 
 vector<JobShop::Ope_sequence> JobShop::sort_ope_sequence(vector<Ope_sequence> x)
@@ -670,7 +680,7 @@ vector<vector<JobShop::Resource_asg>> JobShop::asg_resource(vector<vector<Resour
 
             for (int k = 0; k < x[i][j].assign_pattern; k++)
             {
-                if (patternBorder * k <= x[i][j].assignment && x[i][j].assignment < patternBorder * (k + 1))
+                if (patternBorder * k <= x[i][j].assignment && x[i][j].assignment <= patternBorder * (k + 1))
                 {
                     pattern = k;
                     break;
@@ -1154,56 +1164,56 @@ void JobShop::gene_chromosomes(int i)
 {
     if (i == 0)
     {
-        get_schedule(ope_x0, resource_x0);
-        chromosome.push_back({objective(), ope_x0, resource_x0});
+        get_schedule(sort_ope_x0, resource_x0);
+        chromosome.push_back({objective(), ope_x0, sort_ope_x0, resource_x0});
     }
 
     else if (i == 1)
     {
-        get_schedule(ope_x0, resource_x1);
-        chromosome.push_back({objective(), ope_x0, resource_x1});
+        get_schedule(sort_ope_x0, resource_x1);
+        chromosome.push_back({objective(), ope_x0, sort_ope_x0, resource_x1});
     }
 
     else if (i == 2)
     {
-        get_schedule(ope_x0, resource_x2);
-        chromosome.push_back({objective(), ope_x0, resource_x2});
+        get_schedule(sort_ope_x0, resource_x2);
+        chromosome.push_back({objective(), ope_x0, sort_ope_x0, resource_x2});
     }
 
     else if (i == 3)
     {
-        get_schedule(ope_x1, resource_x0);
-        chromosome.push_back({objective(), ope_x1, resource_x0});
+        get_schedule(sort_ope_x1, resource_x0);
+        chromosome.push_back({objective(), ope_x1, sort_ope_x1, resource_x0});
     }
 
     else if (i == 4)
     {
-        get_schedule(ope_x1, resource_x1);
-        chromosome.push_back({objective(), ope_x1, resource_x1});
+        get_schedule(sort_ope_x1, resource_x1);
+        chromosome.push_back({objective(), ope_x1, sort_ope_x1, resource_x1});
     }
 
     else if (i == 5)
     {
-        get_schedule(ope_x1, resource_x2);
-        chromosome.push_back({objective(), ope_x1, resource_x2});
+        get_schedule(sort_ope_x1, resource_x2);
+        chromosome.push_back({objective(), ope_x1, sort_ope_x1, resource_x2});
     }
 
     else if (i == 6)
     {
-        get_schedule(ope_x2, resource_x0);
-        chromosome.push_back({objective(), ope_x2, resource_x0});
+        get_schedule(sort_ope_x2, resource_x0);
+        chromosome.push_back({objective(), ope_x2, sort_ope_x2, resource_x0});
     }
 
     else if (i == 7)
     {
-        get_schedule(ope_x2, resource_x1);
-        chromosome.push_back({objective(), ope_x2, resource_x1});
+        get_schedule(sort_ope_x2, resource_x1);
+        chromosome.push_back({objective(), ope_x2, sort_ope_x2, resource_x1});
     }
 
     else if (i == 8)
     {
-        get_schedule(ope_x2, resource_x2);
-        chromosome.push_back({objective(), ope_x2, resource_x2});
+        get_schedule(sort_ope_x2, resource_x2);
+        chromosome.push_back({objective(), ope_x2, sort_ope_x2, resource_x2});
     }
 }
 
@@ -1211,11 +1221,15 @@ void JobShop::evolution()
 {
     for (int i = 0; i < NP; i++)
     {
+        cout << "Chromosome" << i << endl;
         Chromosome v = mutation(chromosome[i]);
-        // Chromosome u = crossover(chromosome[i], v);
+        Chromosome u = crossover(chromosome[i], v);
 
         // selection operation
-        // chromosome[i] = min_element(chromosome[i], v, u);
+        if (u < chromosome[i])
+        {
+            chromosome[i] = u;
+        }
     }
 }
 
@@ -1225,9 +1239,11 @@ JobShop::Chromosome JobShop::mutation(Chromosome x)
     Chromosome x_best = *min_element(begin(chromosome), end(chromosome));
     Chromosome x_r1 = chromosome[rand() % 500];
     Chromosome x_r2 = chromosome[rand() % 500];
+    Chromosome diff1 = (x_best - x) * SF;
+    Chromosome diff2 = (x_r1 - x_r2) * SF;
 
-    // mutation
-    v = x + (x_best - x) * SF + (x_r1 - x_r2) * SF;
+    // mutation (rand to best/1/bin)
+    v = x + diff1 + diff2;
 
     // normalization (ope_sequence)
     float max_sequence = max_element(begin(v.ope_sequence), end(v.ope_sequence))->sequence;
@@ -1242,21 +1258,44 @@ JobShop::Chromosome JobShop::mutation(Chromosome x)
     {
         for (int j = 0; j < job[i].ope_size; j++)
         {
-            if (resource_asg[i][j].assignment < 0)
+            if (v.resource_asg[i][j].assignment < 0)
             {
                 v.resource_asg[i][j].assignment = 0;
             }
-            else if (resource_asg[i][j].assignment > 0)
+            else if (v.resource_asg[i][j].assignment > 1)
             {
                 v.resource_asg[i][j].assignment = 1;
             }
         }
     }
 
-    v.ope_sequence = sort_ope_sequence(v.ope_sequence);
+    v.sort_sequence = sort_ope_sequence(v.ope_sequence);
     v.resource_asg = asg_resource(v.resource_asg);
-    get_schedule(v.ope_sequence, v.resource_asg);
+    get_schedule(v.sort_sequence, v.resource_asg);
     v.F = objective();
+
+    /*
+    worker = worker0;
+    machine = machine0;
+    cout << "F:" << v.F << endl;
+    cout << "Operation schedule" << endl;
+    for (int j = 0; j < seq_size; j++)
+    {
+        cout << "(" << v.sort_sequence[j].job_num << "," << v.sort_sequence[j].ope_num << ") : " << v.sort_sequence[j].sequence;
+        cout << endl;
+    }
+    cout << "Resource group assignment" << endl;
+    for (int j = 0; j < job_size; j++)
+    {
+        for (int k = 0; k < job[j].ope_size; k++)
+        {
+            cout << "(" << j << "," << k << ") : " << v.resource_asg[j][k].assignment << " | (" << v.resource_asg[j][k].machine_num << "," << v.resource_asg[j][k].worker_num << ")";
+            cout << endl;
+        }
+    }
+
+    cout << endl;
+    */
 
     return v;
 }
@@ -1273,34 +1312,58 @@ JobShop::Chromosome JobShop::crossover(Chromosome x0, Chromosome x1)
     {
         if (get_rand(0.0, 1.0) <= CRk)
         {
-            u.ope_sequence[i].sequence = x1.ope_sequence[i].sequence;
+            u.ope_sequence.push_back({x1.ope_sequence[i].job_num, x1.ope_sequence[i].ope_num, x1.ope_sequence[i].sequence});
         }
         else
         {
-            u.ope_sequence[i].sequence = x0.ope_sequence[i].sequence;
+            u.ope_sequence.push_back({x0.ope_sequence[i].job_num, x0.ope_sequence[i].ope_num, x0.ope_sequence[i].sequence});
         }
     }
 
     // resource_asg
+    u.resource_asg.resize(job_size);
     for (int i = 0; i < job_size; i++)
     {
         for (int j = 0; j < job[i].ope_size; j++)
         {
             if (get_rand(0.0, 1.0) <= CRk)
             {
-                u.resource_asg[i][j].assignment = x1.resource_asg[i][j].assignment;
+                u.resource_asg[i].push_back({x1.resource_asg[i][j].assignment, x1.resource_asg[i][j].assign_pattern, -1, -1});
             }
             else
             {
-                u.resource_asg[i][j].assignment = x0.resource_asg[i][j].assignment;
+                u.resource_asg[i].push_back({x0.resource_asg[i][j].assignment, x0.resource_asg[i][j].assign_pattern, -1, -1});
             }
         }
     }
 
-    u.ope_sequence = sort_ope_sequence(u.ope_sequence);
+    u.sort_sequence = sort_ope_sequence(u.ope_sequence);
     u.resource_asg = asg_resource(u.resource_asg);
-    get_schedule(u.ope_sequence, u.resource_asg);
+    get_schedule(u.sort_sequence, u.resource_asg);
     u.F = objective();
+
+    /*
+    worker = worker0;
+    machine = machine0;
+    cout << "F:" << u.F << endl;
+    cout << "Operation schedule" << endl;
+    for (int j = 0; j < seq_size; j++)
+    {
+        cout << "(" << u.sort_sequence[j].job_num << "," << u.sort_sequence[j].ope_num << ") : " << u.sort_sequence[j].sequence;
+        cout << endl;
+    }
+    cout << "Resource group assignment" << endl;
+    for (int j = 0; j < job_size; j++)
+    {
+        for (int k = 0; k < job[j].ope_size; k++)
+        {
+            cout << "(" << j << "," << k << ") : " << u.resource_asg[j][k].assignment << " | (" << u.resource_asg[j][k].machine_num << "," << u.resource_asg[j][k].worker_num << ")";
+            cout << endl;
+        }
+    }
+
+    cout << endl;
+    */
 
     return u;
 }
@@ -1339,6 +1402,7 @@ int main()
     }
     */
 
+    /*
     cout << "Chromosomes" << endl;
     for (int i = 0; i < jobShop.NP; i++)
     {
@@ -1362,6 +1426,7 @@ int main()
 
         cout << endl;
     }
+    */
 
     return 0;
 }
