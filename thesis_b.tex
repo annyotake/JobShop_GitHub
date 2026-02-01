@@ -129,12 +129,12 @@ $cross$は子を生成するために使用する交叉方法を指定する．
 							 そして，基本ベクトル$x^G_k$および差分ベクトル$x^G_{best}-x^G_k$, $x^G_{r1}-x^G_{r2}$から変異ベクトル$v^{G+1}_k$を
 							 以下の式(2.1)に基づいて生成する．
 							 \begin{equation}
-							 v^{G+1}_k = x^G_k + SF(x^G_{best} - x^G_k) + SF(x^G_{r1}-x^G_{r2})
+							  v^{G+1}_k = x^G_k + SF(x^G_{best} - x^G_k) + SF(x^G_{r1}-x^G_{r2})
 							 \end{equation}
 	\item[Step2] 交叉：変異ベクトル$v^{G+1}_k$と親個体$x^G_k$を交叉し，子個体$u^{G+1}_k$を生成する．
 	             このとき，以下の式(2.2)に基づいて交叉を行う．
 							 \begin{equation}
-							 u^{G+1}_{kl} = 
+							  u^{G+1}_{kl} = 
 							  \begin{cases}
 							   v^{G+1}_{kl} & \text{if $rand \leq CR$} \\
 								 x^G_{kl}     & \text{otherwise}
@@ -156,7 +156,7 @@ $cross$は子を生成するために使用する交叉方法を指定する．
 \chapter{先行研究}
 本研究に関連する先行研究\cite{Y241}では，１章で述べたとおり，
 機械と作業者の２つの資源で構成され，
-各仕事が機械と作業者を必要とする作業と作業者のみを必要とする作業で行われる生産現場を対象とし，
+各作業が機械と作業者を必要とする作業と作業者のみを必要とする作業で行われる生産現場を対象とし，
 作業間の順序制約，資源制約，機械および作業者の柔軟性，
 メンテナンスなどの資源の利用不可期間といった制約を考慮したFJSPを扱う．
 また，このFJSPのジョブには優先度が設けられており，
@@ -196,30 +196,182 @@ Jayaアルゴリズムである．
 IDEが優れていることが報告されている．
 
 \chapter{問題設定}
+表4.1と表4.2で示した用語を用いて，先行研究を基に，
+本研究で対象とするFJSPを定義する．
+目的関数$F$は以下の式(4.1)のように表され，
+HPジョブは納期内に完了させ，
+LPジョブの納期からの遅延日数と
+作業者の残業時間を最小化することを目的とする．
+
+\begin{equation}
+	\begin{split}
+	  F &= min \left\{\sum_{j|P_j = LP} \max \left[0, \left( \left\lceil\frac{\max\limits_i(pT_{ji})}{3\sigma}\right\rceil - \left\lceil\frac{E_j}{3\sigma}\right\rceil \right)\right]\right. \\
+	    &\quad + \sum_{j|P_j = HP} \max \left[0, \left(\left\lceil\frac{E_j}{3\sigma}\right\rceil - \left\lceil\frac{\max\limits_i(pT_{ji})}{3\sigma}\right\rceil \right)\right] \cdot \left.\frac{E_j - \max\limits_i(pT_{ji})}{t^e_j} \right|_{t^e_j > 0} \\
+		  &\quad + \left.\sum_{j|P_j = HP} \max \left[0, \left( \left\lceil\frac{\max\limits_i(pT_{ji})}{3\sigma}\right\rceil - \left\lceil\frac{E_j}{3\sigma}\right\rceil \right)\right] \cdot H + \sum_{j|P_j = LP} \left\lfloor \frac{t^e_j}{\sigma} \right\rfloor \cdot H \right\}
+	\end{split}
+\end{equation}
+\\
+\begin{equation}
+  t^e_j = 0, \forall j \in \{j|P_j = LP\}
+\end{equation}
+
+\begin{equation}
+	\max_i(pT_{ji}) \leq E_j, \forall j \in \{j|P_j = HP\}
+\end{equation}
+
+\begin{equation}
+	t^e_j \geq E_j - \max_i(pT_{ji}), \forall j \in \{j|P_j = HP\}
+\end{equation}
+
+\begin{equation}
+	\min_i(sT_{ji}) \leq B_j, \forall j \in J
+\end{equation}
+
+\begin{equation}
+	\begin{split}
+	 R^{\tau}_{ji} = 
+	 &
+	 \begin{cases}
+		 \left\{(m,w)|pt^{mw}_{ji} > 0\right\} & \text{if $\tau = 1$} \\
+		 \left\{w|pt^w_{ji} > 0\right\}        & \text{if $\tau = 0$}
+	 \end{cases} \\[-10pt]
+	 & \forall i \in I, j \in J, m \in M, w \in W
+  \end{split}
+\end{equation}
+
+\begin{equation}
+	\begin{split}
+	 &
+	 \begin{cases}
+		 \sum\limits_m x^m_{ji} = 1, \sum\limits_w x^w_{ji} = 1, (m,w) \in R^{\tau}_{ji} & \text{if $\tau = 1$} \\
+		 \sum\limits_w x^w_{ji} = 1, w \in R^{\tau}_{ji} & \text{if $\tau = 0$}
+	 \end{cases} \\[-10pt]
+	 & 　　　　　　　\forall i \in I, j \in J
+  \end{split}
+\end{equation}
+
+\begin{equation}
+	\begin{split}
+	 &
+	 \begin{cases}
+		 cT_{ji} \geq sT_{ji} + \frac{st^{mw}_{ji} \cdot (x^m_{ji} + x^w_{ji})}{2} + \sum\limits^{k_2}\limits_{k=k_1} (E_{wk} - B_{wk}) & \text{if $\tau = 1, sT_{ji} \leq B_{wk_1}, cT_{ji} \geq E_{wk_2}$} \\
+		 cT_{ji} \geq sT_{ji} + \frac{st^{mw}_{ji} \cdot (x^m_{ji} + x^w_{ji})}{2} + \sum\limits^{k_4}\limits_{k=k_3} (E_{mk} - B_{mk}) & \text{if $\tau = 1, sT_{ji} \leq B_{mk_3}, cT_{ji} \geq E_{mk_4}$} \\
+		 cT_{ji} \geq sT_{ji} + st^{w}_{ji} \cdot x^w_{ji} + \sum\limits^{k_2}\limits_{k=k_1} (E_{wk} - B_{wk})                         & \text{if $\tau = 0, sT_{ji} \leq B_{wk_1}, cT_{ji} \geq E_{wk_2}$}
+	 \end{cases} \\[-10pt]
+	 & 　　　　　　　　　　　　　\forall i \in I, j \in J, m \in M, w \in W \\[-10pt]
+	 & 　　　　　　　　　　　　　k_1 \leq k_2 \in K_w, k_3 \leq k_4 \in K_m
+  \end{split}
+\end{equation}
+
+\begin{equation}
+	\begin{split}
+	 &
+	 \begin{cases}
+		 pT_{ji} \geq cT_{ji} + \frac{pt^{mw}_{ji} \cdot (x^m_{ji} + x^w_{ji})}{2} + \sum\limits^{k_2}\limits_{k=k_1} (E_{wk} - B_{wk}) & \text{if $\tau = 1, cT_{ji} \leq B_{wk_1}, pT_{ji} \geq E_{wk_2}$} \\
+		 pT_{ji} \geq cT_{ji} + \frac{pt^{mw}_{ji} \cdot (x^m_{ji} + x^w_{ji})}{2} + \sum\limits^{k_4}\limits_{k=k_3} (E_{mk} - B_{mk}) & \text{if $\tau = 1, cT_{ji} \leq B_{mk_3}, pT_{ji} \geq E_{mk_4}$} \\
+		 pT_{ji} \geq cT_{ji} + pt^{w}_{ji} \cdot x^w_{ji} + \sum\limits^{k_2}\limits_{k=k_1} (E_{wk} - B_{wk})                         & \text{if $\tau = 0, cT_{ji} \leq B_{wk_1}, pT_{ji} \geq E_{wk_2}$}
+	 \end{cases} \\[-10pt]
+	 & 　　　　　　　　　　　　　\forall i \in I, j \in J, m \in M, w \in W \\[-10pt]
+	 & 　　　　　　　　　　　　　k_1 \leq k_2 \in K_w, k_3 \leq k_4 \in K_m
+  \end{split}
+\end{equation}
+
+\begin{equation}
+	\begin{split}
+	 &
+	 \begin{cases}
+		 sT_{ji}, cT_{ji}, pT_{ji} \notin [B_{mk_1}, E_{mk_1}] & \text{if $x^m_{ji} = 1$} \\
+		 sT_{ji}, cT_{ji}, pT_{ji} \notin [B_{mk_2}, E_{mk_2}] & \text{if $x^m_{ji} = 1$} \\
+	 \end{cases} \\[-10pt]
+	 & \forall i \in I, j \in J, m \in M, w \in W, k_1 \in K_m, k_2 \in K_w
+  \end{split}
+\end{equation}
+
+\begin{equation}
+	sT_{j(i+1)} \geq pT_{ji}, \forall i,i+1 \in I, j \in J
+\end{equation}
+
+\begin{equation}
+	\begin{split}
+	 &
+	 \begin{cases}
+		 sT_{j^{\prime}i^{\prime}} \geq pT_{ji} - H \cdot (2 - x^m_{ji}- x^m_{j^{\prime}i^{\prime}} + y^m_{j^{\prime}i^{\prime}ji}) \\ 
+		 sT_{ji} \geq pT_{j^{\prime}i^{\prime}} - H \cdot (3 - x^m_{ji}- x^m_{j^{\prime}i^{\prime}} - y^m_{j^{\prime}i^{\prime}ji})
+	 \end{cases}
+	 \text{if $\tau = 1$} \\
+	 &
+	 \begin{cases}
+		 sT_{j^{\prime}i^{\prime}} \geq pT_{ji} - H \cdot (2 - x^w_{ji}- x^w_{j^{\prime}i^{\prime}} + y^w_{j^{\prime}i^{\prime}ji}) \\ 
+		 sT_{ji} \geq pT_{j^{\prime}i^{\prime}} - H \cdot (3 - x^w_{ji}- x^w_{j^{\prime}i^{\prime}} - y^w_{j^{\prime}i^{\prime}ji})
+	 \end{cases}
+	 , \tau \in \{0, 1\} 
+	 \\[-10pt]
+	 & \forall i,i^{\prime} \in I, j,j^{\prime} \in J, m \in M, w \in W, O_{j^{\prime}i^{\prime}} \ne O_{ji}
+  \end{split}
+\end{equation}
+
+\begin{equation}
+	x^m_{ji}, x^w_{ji}, y^m_{j^{\prime}i^{\prime}ji}, y^w_{j^{\prime}i^{\prime}ji} \in \{0, 1\}, \forall i,i^{\prime} \in I, j,j^{\prime} \in J, m \in M, w \in W
+\end{equation}
+
 \begin{table}[htb]
 \centering
-  \caption{各用語の意味と説明}
-  \begin{tabular}{lll}  \hline
-    用語 & 意味 & 説明 \\ \hline
-    $j$ & ジョブの番号 & $j \in J = \{1,2,\cdots,N_j\}$であり，\\
-		    &             & $N_j$はジョブの数を表す．\\ \hline
-		$i$ & 各ジョブにおける作業の番号 & $i \in I = \{1,2,\cdots,N_{ji}\}$であり，\\
-		    &                          & $N_{ji}$はジョブ$j$の作業の数を表す．\\ \hline
-		$w$ & 作業者の番号 & $w \in W = \{1,2,\cdots,N_w\}$であり，\\
-		    &             & $N_w$は作業者の人数を表す．\\ \hline
-		$m$ & 機械の番号 & $m \in M = \{1,2,\cdots,N_m\}$であり，\\
-		    &           & $N_m$は機械の人数を表す．\\ \hline
-		$d$ & 日付 & $d \in D = \{1,2,\cdots,N_d\}$であり，\\
-		    &      & $N_d$は日数を表す．\\ \hline
-		$\tau$ & 作業の種類 & $\tau \in \{0, 1\}$であり，\\
-		       &           & $\tau = 0$の場合，作業者のみを必要とする作業を，\\
-					 &           & $\tau = 1$の場合，機械と作業者を必要とする作業を表す．\\ \hline
-		$\sigma$ & 標準シフトの分数 & $\sigma = 8 \times 60 = 480$とする． \\ \hline
-		$H$ & ペナルティ係数 & $H = 10^4$とする．\\ \hline
-		
+  \caption{各用語の意味}
+  \begin{tabular}{ll}  \hline
+    用語 & 意味\\ \hline
+    $j$ & ジョブの番号　$j \in J = \{1,2,\cdots,N_j\}$であり，$N_j$はジョブの数を表す．\\ \hline
+		$i$ & 各ジョブにおける作業の番号　$i \in I = \{1,2,\cdots,N_{ji}\}$であり，\\
+		    & $N_{ji}$はジョブ$j$の作業の数を表す．\\ \hline
+		$w$ & 作業者の番号　$w \in W = \{1,2,\cdots,N_w\}$であり，\\
+		    & $N_w$は作業者の人数を表す．\\ \hline
+		$m$ & 機械の番号　$m \in M = \{1,2,\cdots,N_m\}$であり，\\
+		    & $N_m$は機械の人数を表す．\\ \hline
+		$d$ & 日付　$d \in D = \{1,2,\cdots,N_d\}$であり，\\
+		    & $N_d$は日数を表す．\\ \hline
+		$\tau$ & 作業の種類　$\tau \in \{0, 1\}$であり，\\
+		       & $\tau = 0$の場合，作業者のみを必要とする作業を，\\
+					 & $\tau = 1$の場合，機械と作業者を必要とする作業を表す．\\ \hline
+		$\sigma$ & 標準シフトの分数　$\sigma = 8 \times 60 = 480$（分）とする． \\ \hline
+		$H$ & ペナルティ係数　$H = 10^4$とする．\\ \hline
+		$O_{ji}$ & ジョブ$j$の作業$i$ \\ \hline
+		$R^{\tau}_{ji}$ & 作業$O_{ji}$の種類と資源 \\ \hline
+		$B_j$ & ジョブ$j$の開始時間 \\ \hline
+		$E_j$ & ジョブ$j$の完了予定時間 \\ \hline
+		$P_j$ & ジョブ$j$の優先度　$P_j \in \{HP, LP\}$であり，\\
+		      & $HP$は優先度の高いジョブを，$LP$は優先度の低いジョブを表す．\\ \hline
+		$[B_{mk}, E_{mk}]$ & 機械$m$の利用不可期間　$k \in K_m = \{1,2,\cdots,N^k_m\}$であり，\\
+		                   & $N^k_m$は機械$m$の利用不可期間の数を表す．\\ \hline
+		$[B_{wk}, E_{wk}]$ & 作業者$w$が作業をしていない期間　$k \in K_w = \{1,2,\cdots,N^k_w\}$であり，\\
+		                   & $N^k_w$は作業者$w$が作業をしていない期間の数を表す．\\ \hline
   \end{tabular}
 \end{table}
 
+\begin{table}[htb]
+\centering
+  \caption{各用語の意味}
+  \begin{tabular}{ll}  \hline
+    用語 & 意味\\ \hline
+		$st^{mw}_{ji}$ & $\tau = 1$の場合において，作業者$w$が機械$m$によって，\\
+		               & 作業$O_{ji}$を実行するときの準備時間 \\ \hline
+		$st^w_{ji}$ & $\tau = 0$の場合において，作業者$w$が作業$O_{ji}$を実行するときの準備時間 \\ \hline
+		$pt^{mw}_{ji}$ & $\tau = 1$の場合において，作業者$w$が機械$m$によって，\\
+		               & 作業$O_{ji}$を実行するときの実行時間 \\ \hline
+		$pt^w_{ji}$ & $\tau = 0$の場合において，作業者$w$が作業$O_{ji}$を実行するときの実行時間 \\ \hline
+		$sT_{ji}$ & 作業$O_{ji}$の準備開始時間 \\ \hline
+		$cT_{ji}$ & 作業$O_{ji}$の準備完了時間 \\ \hline
+		$pT_{ji}$ & 作業$O_{ji}$の実行完了時間 \\ \hline
+		$x^m_{ji}$ & $\tau = 1$の場合において，作業$O_{ji}$が機械$m$によって実行される場合，$x^m_{ji} = 1$，\\
+		           & そうでない場合，$x^m_{ji} = 0$ \\ \hline
+		$y^m_{jij^{\prime}i^{\prime}}$ & $\tau = 1$の場合において，作業$O_{ji}$が機械$m$によって実行されることが，\\
+		                               & 作業$O_{j^{\prime}i^{\prime}}$よりも先にスケジューリングされている場合，$x^m_{ji} = 1$，\\
+		                               & そうでない場合，$x^m_{ji} = 0$ \\ \hline
+	  $x^w_{ji}$ & 作業者$w$が作業$O_{ji}$を実行する場合，$x^w_{ji} = 1$，\\
+		           & そうでない場合，$x^w_{ji} = 0$ \\ \hline
+		$y^w_{jij^{\prime}i^{\prime}}$ & 作業者$w$が作業$O_{ji}$を実行することが，\\
+		                               & 作業$O_{j^{\prime}i^{\prime}}$よりも先にスケジューリングされている場合，$x^w_{ji} = 1$，\\
+		                               & そうでない場合，$x^w_{ji} = 0$ \\ \hline
+  \end{tabular}
+\end{table}
 
 \chapter{提案解法}
 
