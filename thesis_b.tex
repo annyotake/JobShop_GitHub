@@ -84,7 +84,12 @@ HPジョブが納期内に完了しない場合の作業者の残業時間を最
 
 本研究では，上記の先行研究を基に，
 作業者の希望も考慮したシフトと生産スケジュールを作成する最適化法を提案する．
-（シフトの希望に沿ってシフトを決定するアルゴリズムの簡単な説明）
+先行研究の２段階でスケジューリングを行う解法では，
+１段階目で得たスケジュールにおいて
+HPジョブが納期内に完了していない場合に，
+２段階目でHPジョブが納期内に完了することを目指しつつ，
+作業者の残業時間を最小化しており，
+本研究ではこの段階で作業者の希望も考慮する．
 
 本報告書の構成について述べる．
 第２章では，本研究で用いるDEを，
@@ -196,6 +201,7 @@ Jayaアルゴリズムである．
 IDEが優れていることが報告されている．
 
 \chapter{問題設定}
+（問題の目的）（仮定）
 表4.1と表4.2で示した用語を用いて，先行研究を基に，
 本研究で対象とするFJSPを定義する．
 目的関数$F$は以下の式(4.1)のように表され，
@@ -207,10 +213,16 @@ LPジョブの納期からの遅延日数と
 	\begin{split}
 	  F &= min \left\{\sum_{j|P_j = LP} \max \left[0, \left( \left\lceil\frac{\max\limits_i(pT_{ji})}{3\sigma}\right\rceil - \left\lceil\frac{E_j}{3\sigma}\right\rceil \right)\right]\right. \\
 	    &\quad + \sum_{j|P_j = HP} \max \left[0, \left(\left\lceil\frac{E_j}{3\sigma}\right\rceil - \left\lceil\frac{\max\limits_i(pT_{ji})}{3\sigma}\right\rceil \right)\right] \cdot \left.\frac{E_j - \max\limits_i(pT_{ji})}{t^e_j} \right|_{t^e_j > 0} \\
+			&\quad + \sum_w{\sum_d \max \left[0, \left( wt^w_d - \sigma - ot^w_d \right) \right]} \cdot H \\
 		  &\quad + \left.\sum_{j|P_j = HP} \max \left[0, \left( \left\lceil\frac{\max\limits_i(pT_{ji})}{3\sigma}\right\rceil - \left\lceil\frac{E_j}{3\sigma}\right\rceil \right)\right] \cdot H + \sum_{j|P_j = LP} \left\lfloor \frac{t^e_j}{\sigma} \right\rfloor \cdot H \right\}
 	\end{split}
 \end{equation}
 \\
+
+\begin{equation}
+  t^e_j = \sum_i{\sum_w{\sum^{\left\lceil\frac{pT_{ji}}{3\sigma}\right\rceil}_{d = \left\lceil\frac{sT_{ji}}{3\sigma}\right\rceil}{\left( wt^w_d - \sigma \right)}}}
+\end{equation}
+
 \begin{equation}
   t^e_j = 0, \forall j \in \{j|P_j = LP\}
 \end{equation}
@@ -316,7 +328,7 @@ LPジョブの納期からの遅延日数と
 
 \begin{table}[htb]
 \centering
-  \caption{各用語の意味}
+  \caption{各用語の意味（１）}
   \begin{tabular}{ll}  \hline
     用語 & 意味\\ \hline
     $j$ & ジョブの番号　$j \in J = \{1,2,\cdots,N_j\}$であり，$N_j$はジョブの数を表す．\\ \hline
@@ -328,10 +340,12 @@ LPジョブの納期からの遅延日数と
 		    & $N_m$は機械の人数を表す．\\ \hline
 		$d$ & 日付　$d \in D = \{1,2,\cdots,N_d\}$であり，\\
 		    & $N_d$は日数を表す．\\ \hline
+		$wt^w_d$ & 作業者$w$の日付$d$における作業時間　シフトによって変わる． \\ \hline
+		$\sigma$ & 標準シフトの分数　$\sigma = 8 \times 60 = 480$（分）とする． \\ \hline
+		$ot^w_d$ & 作業者$w$が希望する日付$d$における残業時間 \\ \hline
 		$\tau$ & 作業の種類　$\tau \in \{0, 1\}$であり，\\
 		       & $\tau = 0$の場合，作業者のみを必要とする作業を，\\
 					 & $\tau = 1$の場合，機械と作業者を必要とする作業を表す．\\ \hline
-		$\sigma$ & 標準シフトの分数　$\sigma = 8 \times 60 = 480$（分）とする． \\ \hline
 		$H$ & ペナルティ係数　$H = 10^4$とする．\\ \hline
 		$O_{ji}$ & ジョブ$j$の作業$i$ \\ \hline
 		$R^{\tau}_{ji}$ & 作業$O_{ji}$の種類と資源 \\ \hline
@@ -341,14 +355,15 @@ LPジョブの納期からの遅延日数と
 		      & $HP$は優先度の高いジョブを，$LP$は優先度の低いジョブを表す．\\ \hline
 		$[B_{mk}, E_{mk}]$ & 機械$m$の利用不可期間　$k \in K_m = \{1,2,\cdots,N^k_m\}$であり，\\
 		                   & $N^k_m$は機械$m$の利用不可期間の数を表す．\\ \hline
-		$[B_{wk}, E_{wk}]$ & 作業者$w$が作業をしていない期間　$k \in K_w = \{1,2,\cdots,N^k_w\}$であり，\\
+		$[B_{wk}, E_{wk}]$ & 作業者$w$が作業をしていないまたは他の作業をしている期間 \\
+		                   & $k \in K_w = \{1,2,\cdots,N^k_w\}$であり，\\
 		                   & $N^k_w$は作業者$w$が作業をしていない期間の数を表す．\\ \hline
   \end{tabular}
 \end{table}
 
 \begin{table}[htb]
 \centering
-  \caption{各用語の意味}
+  \caption{各用語の意味（２）}
   \begin{tabular}{ll}  \hline
     用語 & 意味\\ \hline
 		$st^{mw}_{ji}$ & $\tau = 1$の場合において，作業者$w$が機械$m$によって，\\

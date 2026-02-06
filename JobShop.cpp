@@ -13,6 +13,14 @@ using namespace std;
 
 #define HP 1
 #define LP 0
+#define MAX_TIME 525600 // one year
+
+/*　
+やること
+・データ量を増やす
+・シフトの調整
+・calc_overtime(), エラーの原因:どのchromosomeのope_sequenceとresource_asgであるかを指定していない
+*/
 
 class JobShop
 {
@@ -26,9 +34,16 @@ public:
     float SF = 0.7; // mutation factor
     float CR = 0.2; // crossover factor
 
+    struct Shift
+    {
+        float workingtime;
+        vector<float> shift = {-1, -1};
+        float overtime;
+    };
+
     struct Worker
     {
-        int shift[2]; // weekday and weekend shift
+        vector<Shift> shifts;
         int ut_quantity;
         vector<vector<float>> ut;  // unavailable periods
         vector<vector<float>> st0; // the setup time of each operation when τ = 0
@@ -80,7 +95,7 @@ public:
     {
         int job_num;
         int ope_num;
-        float sequence;
+        double sequence;
 
         bool operator<(Ope_sequence &another)
         {
@@ -90,7 +105,7 @@ public:
 
     struct Resource_asg
     {
-        float assignment;
+        double assignment;
         int assign_pattern;
         int worker_num;
         int machine_num;
@@ -175,8 +190,10 @@ public:
     ifstream ifs;
 
     int job_size;
+    int workingday;
+    float standard_time = 480;
+    vector<float> standard_shift = {480, 1020};
     vector<Worker> worker;
-    float shift_time[6] = {-1, 480, 600, 720, 420, 0};
     vector<Machine> machine;
     vector<Worker> worker0;   // original worker parameters
     vector<Machine> machine0; // original machine parameters
@@ -206,8 +223,9 @@ private:
     // setting function
     void init_instance();
     void init_parameters();
+    void adjust_ut();
 
-    float get_rand(float x0, float x1);
+    double get_rand(double x0, double x1);
     void init_ope_sequence();
     vector<Ope_sequence> sort_ope_sequence(vector<Ope_sequence> x);
     void init_asg_resource();
@@ -220,8 +238,8 @@ private:
     void update_ut(int j, int o, int w, int m);        // type1
 
     // objective function
-    float objective();
-    float calc_overtime(int i);
+    float objective(vector<vector<Resource_asg>> x);
+    float calc_overtime(vector<vector<Resource_asg>> x, int i);
 
     // chromosomes function
     void init_chromosomes();
@@ -231,6 +249,9 @@ private:
     void evolution();                                   // evolution
     Chromosome mutation(Chromosome x);                  // mutation operation by rand to best/1/bin
     Chromosome crossover(Chromosome x0, Chromosome x1); // crossover operation
+
+    // adjusument function
+    void adjust_shifts();
 };
 
 JobShop::JobShop()
@@ -244,11 +265,14 @@ JobShop::JobShop()
     /* Parameters Initialization */
     init_parameters();
 
-    /* Chromosome Initialization*/
+    /* Chromosomes Initialization*/
     init_chromosomes();
 
     /* IDE */
     evolution();
+
+    /* Shifts adjustment */
+    adjust_shifts();
 }
 
 void JobShop::init_instance()
@@ -341,32 +365,122 @@ void JobShop::init_parameters()
 
     /* Shift of worker Initialization */
     cout << "Shift of worker" << endl;
+    ifs.ignore(INT_MAX, '/');
+    ifs >> workingday; // workingday
+    cout << "workingday:" << workingday << endl;
+
     for (int i = 0; i < worker_size; i++)
     {
-        ifs.ignore(INT_MAX, '/');
-        ifs >> worker[i].shift[0]; // weekday shift
-        ifs >> worker[i].shift[1]; // weekend shift
+        worker[i].shifts.resize(workingday);
 
-        cout << "worker" << i << ":" << worker[i].shift[0] << " " << worker[i].shift[1];
+        ifs.ignore(INT_MAX, '/');
+
+        int inserted = 0;
+        int dayoff = 0;
+
+        cout << "worker" << i << endl;
+        for (int j = 0; j < workingday; j++)
+        {
+            // overtime
+            ifs >> worker[i].shifts[j].overtime;
+
+            // standard shift
+            if (j % 7 == 5 || j % 7 == 6) // weekend
+            {
+                if (worker[i].shifts[j].overtime > 0)
+                {
+                    // cout << "overtime" << endl;
+                    worker[i].shifts[j].workingtime = worker[i].shifts[j].overtime;
+                    ifs >> worker[i].shifts[j].shift[0];
+                    ifs >> worker[i].shifts[j].shift[1];
+                }
+                else
+                {
+                    worker[i].shifts[j].workingtime = 0;
+                }
+            }
+            else // weekday
+            {
+                // shift
+                worker[i].shifts[j].workingtime = standard_time;
+                worker[i].shifts[j].shift = standard_shift;
+                worker[i].shifts[j].shift[0] += 1440 * j;
+                worker[i].shifts[j].shift[1] += 1440 * j;
+            }
+
+            // ut (shift)
+            if (worker[i].shifts[j].shift[0] > 0 || worker[i].shifts[j].shift[1] > 0)
+            {
+                if (inserted == 0)
+                {
+                    worker[i].ut.push_back({0, worker[i].shifts[j].shift[0]});
+                    inserted++;
+                }
+                else
+                {
+                    if (worker[i].shifts[j - 1].shift[1] < 0)
+                    {
+                        worker[i].ut.push_back({worker[i].shifts[j - (1 + dayoff)].shift[1], worker[i].shifts[j].shift[0]});
+                    }
+                    else
+                    {
+                        worker[i].ut.push_back({worker[i].shifts[j - 1].shift[1], worker[i].shifts[j].shift[0]});
+                    }
+
+                    inserted++;
+                }
+
+                dayoff = 0;
+            }
+            else
+            {
+                dayoff++;
+            }
+
+            if (j == workingday - 1)
+            {
+                worker[i].ut.push_back({worker[i].shifts[workingday - (1 + dayoff)].shift[1], MAX_TIME});
+            }
+
+            cout << "workingtime:" << worker[i].shifts[j].workingtime
+                 << " shift:" << worker[i].shifts[j].shift[0] << " " << worker[i].shifts[j].shift[1]
+                 << " overtime:" << worker[i].shifts[j].overtime << endl;
+        }
         cout << endl;
     }
-    cout << endl;
 
     /* Unavailable periods of worker Initialization */
     cout << "Unavailable periods of worker" << endl;
+    float ut0, ut1; // temp for Unavailable periods of worker
     for (int i = 0; i < worker_size; i++)
     {
         ifs.ignore(INT_MAX, '/');
         ifs >> worker[i].ut_quantity; // quantity of unavailable periods
 
+        // ut (break time)
+        for (int j = 0; j < worker[i].ut_quantity; j++)
+        {
+            ifs >> ut0; // start
+            ifs >> ut1; // end
+
+            for (int k = 0; k < worker[i].ut.size(); k++)
+            {
+                if (ut1 < worker[i].ut[k][0])
+                {
+                    worker[i].ut.insert(worker[i].ut.begin() + k, {ut0, ut1});
+                    break;
+                }
+            }
+        }
+
+        worker[i].ut_quantity = worker[i].ut.size();
+    }
+
+    for (int i = 0; i < worker_size; i++)
+    {
         cout << "worker" << i << ":";
         for (int j = 0; j < worker[i].ut_quantity; j++)
         {
-            worker[i].ut.resize(worker[i].ut_quantity);
-            worker[i].ut[j].resize(2);
-            ifs >> worker[i].ut[j][0]; // start
-            ifs >> worker[i].ut[j][1]; // end
-
             cout << worker[i].ut[j][0] << " ";
             cout << worker[i].ut[j][1] << "  ";
         }
@@ -500,13 +614,13 @@ void JobShop::init_parameters()
     machine0 = machine;
 }
 
-float JobShop::get_rand(float x0, float x1)
+double JobShop::get_rand(double x0, double x1)
 {
     // 乱数生成器
     static mt19937_64 mt64(time(0));
 
     // [0.0, x) の一様分布実数生成器
-    uniform_real_distribution<float> get_rand_uni_real(x0, x1);
+    uniform_real_distribution<double> get_rand_uni_real(x0, x1);
 
     // 乱数を生成
     return get_rand_uni_real(mt64);
@@ -532,11 +646,11 @@ void JobShop::init_ope_sequence()
     {
         if (job[ope_sequence[i].job_num].priority == HP)
         {
-            ope_sequence[i].sequence = get_rand((float)ope_sequence[i].ope_num / order, (float)ope_sequence[i].ope_num / order + (float)1 / (order * 2));
+            ope_sequence[i].sequence = get_rand((double)ope_sequence[i].ope_num / order, (double)ope_sequence[i].ope_num / order + (double)1 / (order * 2));
         }
         else
         {
-            ope_sequence[i].sequence = get_rand((float)ope_sequence[i].ope_num / order + (float)1 / (order * 2), (float)(ope_sequence[i].ope_num + 1) / order);
+            ope_sequence[i].sequence = get_rand((double)ope_sequence[i].ope_num / order + (double)1 / (order * 2), (double)(ope_sequence[i].ope_num + 1) / order);
         }
     }
 
@@ -548,11 +662,11 @@ void JobShop::init_ope_sequence()
     {
         if (job[ope_sequence[i].job_num].priority == HP)
         {
-            ope_sequence[i].sequence = get_rand((float)ope_sequence[i].ope_num / order, (float)(ope_sequence[i].ope_num + 1) / order) / 2;
+            ope_sequence[i].sequence = get_rand((double)ope_sequence[i].ope_num / order, (double)(ope_sequence[i].ope_num + 1) / order) / 2;
         }
         else
         {
-            ope_sequence[i].sequence = get_rand((float)ope_sequence[i].ope_num / (order * 2) + 0.5, (float)(ope_sequence[i].ope_num + 1) / (order * 2) + 0.5);
+            ope_sequence[i].sequence = get_rand((double)ope_sequence[i].ope_num / (order * 2) + 0.5, (double)(ope_sequence[i].ope_num + 1) / (order * 2) + 0.5);
         }
     }
 
@@ -609,7 +723,7 @@ void JobShop::init_asg_resource()
                 }
 
                 int asg_index = distance(pdt.begin(), min_element(pdt.begin(), pdt.end()));
-                resource_asg[i][j].assignment = get_rand((float)asg_index / resource_asg[i][j].assign_pattern, (float)(asg_index + 1) / resource_asg[i][j].assign_pattern);
+                resource_asg[i][j].assignment = get_rand((double)asg_index / resource_asg[i][j].assign_pattern, (double)(asg_index + 1) / resource_asg[i][j].assign_pattern);
             }
 
             else if (job[i].operation[j].resource.type == 1)
@@ -623,7 +737,7 @@ void JobShop::init_asg_resource()
                 }
 
                 int asg_index = distance(pdt.begin(), min_element(pdt.begin(), pdt.end()));
-                resource_asg[i][j].assignment = get_rand((float)asg_index / resource_asg[i][j].assign_pattern, (float)(asg_index + 1) / resource_asg[i][j].assign_pattern);
+                resource_asg[i][j].assignment = get_rand((double)asg_index / resource_asg[i][j].assign_pattern, (double)(asg_index + 1) / resource_asg[i][j].assign_pattern);
             }
         }
     }
@@ -646,7 +760,7 @@ void JobShop::init_asg_resource()
                 }
 
                 int asg_index = distance(ot.begin(), min_element(ot.begin(), ot.end()));
-                resource_asg[i][j].assignment = get_rand((float)asg_index / resource_asg[i][j].assign_pattern, (float)(asg_index + 1) / resource_asg[i][j].assign_pattern);
+                resource_asg[i][j].assignment = get_rand((double)asg_index / resource_asg[i][j].assign_pattern, (double)(asg_index + 1) / resource_asg[i][j].assign_pattern);
             }
 
             else if (job[i].operation[j].resource.type == 1)
@@ -661,7 +775,7 @@ void JobShop::init_asg_resource()
                 }
 
                 int asg_index = distance(ot.begin(), min_element(ot.begin(), ot.end()));
-                resource_asg[i][j].assignment = get_rand((float)asg_index / resource_asg[i][j].assign_pattern, (float)(asg_index + 1) / resource_asg[i][j].assign_pattern);
+                resource_asg[i][j].assignment = get_rand((double)asg_index / resource_asg[i][j].assign_pattern, (double)(asg_index + 1) / resource_asg[i][j].assign_pattern);
             }
         }
     }
@@ -676,7 +790,7 @@ vector<vector<JobShop::Resource_asg>> JobShop::asg_resource(vector<vector<Resour
         for (int j = 0; j < job[i].ope_size; j++)
         {
             int pattern;
-            float patternBorder = (float)1 / (x[i][j].assign_pattern);
+            double patternBorder = (double)1 / (x[i][j].assign_pattern);
 
             for (int k = 0; k < x[i][j].assign_pattern; k++)
             {
@@ -953,124 +1067,125 @@ void JobShop::analyze_schedule(int j, int o, int w, int m)
 
 void JobShop::update_ut(int j, int o, int w)
 {
-    bool flag_erase = false;
-    int index_insert = -1;
+    int index = -1;
+    int erased = 0;
 
     for (int k = 0; k < worker[w].ut_quantity; k++)
     {
-        if (job[j].operation[o].sT <= worker[w].ut[k][0] && worker[w].ut[k][1] <= job[j].operation[o].pT)
+        if (index == -1 && job[j].operation[o].sT <= worker[w].ut[k][0])
         {
-            worker[w].ut.erase(worker[w].ut.begin() + k);
-            worker[w].ut_quantity--;
+            index = k;
+        }
 
-            if (!flag_erase)
-            {
-                index_insert = k;
-                flag_erase = true;
-            }
-        }
-        else if (job[j].operation[o].pT <= worker[w].ut[k][0])
+        if (job[j].operation[o].sT <= worker[w].ut[k][0] && worker[w].ut[k][0] <= job[j].operation[o].pT)
         {
-            if (!flag_erase)
-            {
-                index_insert = k;
-            }
-        }
-        else
-        {
-            if (!flag_erase)
-            {
-                index_insert = k + 1;
-            }
+            erased++;
         }
     }
 
-    if (index_insert != -1)
+    if (erased > 0)
     {
-        worker[w].ut.insert(worker[w].ut.begin() + index_insert, {job[j].operation[o].sT, job[j].operation[o].pT});
-        worker[w].ut_quantity++;
+        for (int i = index; i < index + erased; i++)
+        {
+            worker[w].ut.erase(worker[w].ut.begin() + index);
+            worker[w].ut_quantity--;
+        }
+    }
+
+    if (index != -1)
+    {
+        if (index != 0 && job[j].operation[o].sT == worker[w].ut[index - 1][1])
+        {
+            worker[w].ut[index - 1][1] = job[j].operation[o].pT;
+        }
+        else
+        {
+            worker[w].ut.insert(worker[w].ut.begin() + index, {job[j].operation[o].sT, job[j].operation[o].pT});
+            worker[w].ut_quantity++;
+        }
     }
 }
 
 void JobShop::update_ut(int j, int o, int w, int m)
 {
-    bool flag_erase = false;
-    int index_insert = -1;
+    int index = -1;
+    int erased = 0;
 
     for (int k = 0; k < worker[w].ut_quantity; k++)
     {
-        if (job[j].operation[o].sT <= worker[w].ut[k][0] && worker[w].ut[k][1] <= job[j].operation[o].pT)
+        if (index == -1 && job[j].operation[o].sT <= worker[w].ut[k][0])
         {
-            worker[w].ut.erase(worker[w].ut.begin() + k);
-            worker[w].ut_quantity--;
-
-            if (!flag_erase)
-            {
-                index_insert = k;
-                flag_erase = true;
-            }
+            index = k;
         }
-        else if (job[j].operation[o].pT <= worker[w].ut[k][0])
+
+        if (job[j].operation[o].sT <= worker[w].ut[k][0] && worker[w].ut[k][0] <= job[j].operation[o].pT)
         {
-            if (!flag_erase)
-            {
-                index_insert = k;
-            }
+            erased++;
+        }
+    }
+
+    if (erased > 0)
+    {
+        for (int i = index; i < index + erased; i++)
+        {
+            worker[w].ut.erase(worker[w].ut.begin() + index);
+            worker[w].ut_quantity--;
+        }
+    }
+
+    if (index != -1)
+    {
+        if (index != 0 && job[j].operation[o].sT == worker[w].ut[index - 1][1])
+        {
+            worker[w].ut[index - 1][1] = job[j].operation[o].pT;
         }
         else
         {
-            if (!flag_erase)
-            {
-                index_insert = k + 1;
-            }
+            worker[w].ut.insert(worker[w].ut.begin() + index, {job[j].operation[o].sT, job[j].operation[o].pT});
+            worker[w].ut_quantity++;
         }
     }
 
-    if (index_insert != -1)
-    {
-        worker[w].ut.insert(worker[w].ut.begin() + index_insert, {job[j].operation[o].sT, job[j].operation[o].pT});
-        worker[w].ut_quantity++;
-    }
+    index = -1;
+    erased = 0;
 
-    flag_erase = false;
-    index_insert = -1;
     for (int k = 0; k < machine[m].ut_quantity; k++)
     {
-        if (job[j].operation[o].sT <= machine[m].ut[k][0] && machine[m].ut[k][1] <= job[j].operation[o].pT)
+        if (index == -1 && job[j].operation[o].sT <= machine[m].ut[k][0])
         {
-            machine[m].ut.erase(machine[m].ut.begin() + k);
-            machine[m].ut_quantity--;
+            index = k;
+        }
 
-            if (!flag_erase)
-            {
-                index_insert = k;
-                flag_erase = true;
-            }
-        }
-        else if (job[j].operation[o].pT <= machine[m].ut[k][0])
+        if (job[j].operation[o].sT <= machine[m].ut[k][0] && machine[m].ut[k][0] <= job[j].operation[o].pT)
         {
-            if (!flag_erase)
-            {
-                index_insert = k;
-            }
-        }
-        else
-        {
-            if (!flag_erase)
-            {
-                index_insert = k + 1;
-            }
+            erased++;
         }
     }
 
-    if (index_insert != -1)
+    if (erased > 0)
     {
-        machine[m].ut.insert(machine[m].ut.begin() + index_insert, {job[j].operation[o].sT, job[j].operation[o].pT});
-        machine[m].ut_quantity++;
+        for (int i = index; i < index + erased; i++)
+        {
+            machine[m].ut.erase(machine[m].ut.begin() + index);
+            machine[m].ut_quantity--;
+        }
+    }
+
+    if (index != -1)
+    {
+        if (index != 0 && job[j].operation[o].sT == machine[m].ut[index - 1][1])
+        {
+            machine[m].ut[index - 1][1] = job[j].operation[o].pT;
+        }
+        else
+        {
+            machine[m].ut.insert(machine[m].ut.begin() + index, {job[j].operation[o].sT, job[j].operation[o].pT});
+            machine[m].ut_quantity++;
+        }
     }
 }
 
-float JobShop::objective()
+float JobShop::objective(vector<vector<Resource_asg>> x)
 {
     float overdue = 0;  // overdue days of LP jobs
     float overtime = 0; // total overtime of workers for HP jobs
@@ -1081,10 +1196,7 @@ float JobShop::objective()
     {
         float maxpT;
 
-        int j = 0;
-        for (; j < job[i].ope_size; j++)
-            ;
-        maxpT = job[i].operation[j - 1].pT;
+        maxpT = job[i].operation[job[i].ope_size - 1].pT;
 
         // calculate overdue
         if (job[i].priority == LP)
@@ -1101,7 +1213,7 @@ float JobShop::objective()
             int temp = ceil(job[i].dT / 1440) - ceil(maxpT / 1440);
             if (temp > 0)
             {
-                t = calc_overtime(i);
+                t = calc_overtime(x, i);
                 if (t > 0)
                 {
                     overtime += temp * (job[i].dT - maxpT) / t;
@@ -1120,14 +1232,16 @@ float JobShop::objective()
     return F;
 }
 
-float JobShop::calc_overtime(int i)
+float JobShop::calc_overtime(vector<vector<Resource_asg>> x, int i)
 {
     float overtime = 0;
 
     for (int j = 0; j < job[i].ope_size; j++)
     {
-        int workday = ceil(job[i].operation[j].pT / 1440) - ceil(job[i].operation[j].sT / 1440) + 1;
-        overtime += ((shift_time[worker[resource_asg[i][j].worker_num].shift[0]] - 480) + shift_time[worker[resource_asg[i][j].worker_num].shift[1]]) * workday;
+        for (int d = ceil(job[i].operation[j].sT / 1440); d < ceil(job[i].operation[j].pT / 1440) + 1; d++)
+        {
+            overtime += worker[x[i][j].worker_num].shifts[d].workingtime - standard_time;
+        }
     }
 
     return overtime;
@@ -1146,16 +1260,12 @@ void JobShop::init_chromosomes()
 
         for (int j = 0; j < 9; j++)
         {
-            worker = worker0;
-            machine = machine0;
             gene_chromosomes(j);
         }
     }
 
     for (int i = 0; i < NP - (NP / 9) * 9; i++)
     {
-        worker = worker0;
-        machine = machine0;
         gene_chromosomes(rand() % 9);
     }
 }
@@ -1165,63 +1275,135 @@ void JobShop::gene_chromosomes(int i)
     if (i == 0)
     {
         get_schedule(sort_ope_x0, resource_x0);
-        chromosome.push_back({objective(), ope_x0, sort_ope_x0, resource_x0});
+        chromosome.push_back({objective(resource_x0), ope_x0, sort_ope_x0, resource_x0});
     }
 
     else if (i == 1)
     {
         get_schedule(sort_ope_x0, resource_x1);
-        chromosome.push_back({objective(), ope_x0, sort_ope_x0, resource_x1});
+        chromosome.push_back({objective(resource_x1), ope_x0, sort_ope_x0, resource_x1});
     }
 
     else if (i == 2)
     {
         get_schedule(sort_ope_x0, resource_x2);
-        chromosome.push_back({objective(), ope_x0, sort_ope_x0, resource_x2});
+        chromosome.push_back({objective(resource_x2), ope_x0, sort_ope_x0, resource_x2});
     }
 
     else if (i == 3)
     {
         get_schedule(sort_ope_x1, resource_x0);
-        chromosome.push_back({objective(), ope_x1, sort_ope_x1, resource_x0});
+        chromosome.push_back({objective(resource_x0), ope_x1, sort_ope_x1, resource_x0});
     }
 
     else if (i == 4)
     {
         get_schedule(sort_ope_x1, resource_x1);
-        chromosome.push_back({objective(), ope_x1, sort_ope_x1, resource_x1});
+        chromosome.push_back({objective(resource_x1), ope_x1, sort_ope_x1, resource_x1});
     }
 
     else if (i == 5)
     {
         get_schedule(sort_ope_x1, resource_x2);
-        chromosome.push_back({objective(), ope_x1, sort_ope_x1, resource_x2});
+        chromosome.push_back({objective(resource_x2), ope_x1, sort_ope_x1, resource_x2});
     }
 
     else if (i == 6)
     {
         get_schedule(sort_ope_x2, resource_x0);
-        chromosome.push_back({objective(), ope_x2, sort_ope_x2, resource_x0});
+        chromosome.push_back({objective(resource_x0), ope_x2, sort_ope_x2, resource_x0});
     }
 
     else if (i == 7)
     {
         get_schedule(sort_ope_x2, resource_x1);
-        chromosome.push_back({objective(), ope_x2, sort_ope_x2, resource_x1});
+        chromosome.push_back({objective(resource_x1), ope_x2, sort_ope_x2, resource_x1});
     }
 
     else if (i == 8)
     {
         get_schedule(sort_ope_x2, resource_x2);
-        chromosome.push_back({objective(), ope_x2, sort_ope_x2, resource_x2});
+        chromosome.push_back({objective(resource_x2), ope_x2, sort_ope_x2, resource_x2});
     }
+
+    worker = worker0;
+    machine = machine0;
 }
 
 void JobShop::evolution()
 {
+    /*
+    cout << "Chromosomes" << endl;
     for (int i = 0; i < NP; i++)
     {
-        cout << "Chromosome" << i << endl;
+        cout << "Chromosome number:" << i << endl;
+        cout << "F:" << chromosome[i].F << endl;
+        cout << "Operation schedule" << endl;
+        for (int j = 0; j < seq_size; j++)
+        {
+            cout << "(" << chromosome[i].ope_sequence[j].job_num << "," << chromosome[i].ope_sequence[j].ope_num << ") : " << chromosome[i].ope_sequence[j].sequence;
+            cout << endl;
+        }
+        cout << "Resource group assignment" << endl;
+        for (int j = 0; j < job_size; j++)
+        {
+            for (int k = 0; k < job[j].ope_size; k++)
+            {
+                cout << "(" << j << "," << k << ") : " << chromosome[i].resource_asg[j][k].assignment << " | (" << chromosome[i].resource_asg[j][k].machine_num << "," << chromosome[i].resource_asg[j][k].worker_num << ")";
+                cout << endl;
+            }
+        }
+        cout << "processing completion time" << endl;
+        get_schedule(chromosome[i].sort_sequence, chromosome[i].resource_asg);
+        for (int j = 0; j < job_size; j++)
+        {
+            cout << "maxpT" << job[j].operation[job[j].ope_size - 1].pT;
+            cout << endl;
+        }
+        worker = worker0;
+        machine = machine0;
+        cout << endl;
+    }
+    */
+
+    Chromosome chromosome_best = *min_element(begin(chromosome), end(chromosome));
+    get_schedule(chromosome_best.sort_sequence, chromosome_best.resource_asg);
+
+    cout << "Best Chromosome before" << endl;
+    cout << "F:" << chromosome_best.F << endl;
+
+    cout << "Operation schedule" << endl;
+    for (int j = 0; j < seq_size; j++)
+    {
+        cout << "(" << chromosome_best.sort_sequence[j].job_num << "," << chromosome_best.sort_sequence[j].ope_num << ") : " << chromosome_best.sort_sequence[j].sequence;
+        cout << endl;
+    }
+
+    cout << "Resource group assignment" << endl;
+    for (int j = 0; j < job_size; j++)
+    {
+        for (int k = 0; k < job[j].ope_size; k++)
+        {
+            cout << "(" << j << "," << k << ") : " << chromosome_best.resource_asg[j][k].assignment << " | (" << chromosome_best.resource_asg[j][k].machine_num << "," << chromosome_best.resource_asg[j][k].worker_num << ")";
+            cout << endl;
+        }
+    }
+
+    cout << "processing completion time" << endl;
+    for (int j = 0; j < job_size; j++)
+    {
+        cout << "maxpT" << job[j].operation[job[j].ope_size - 1].pT;
+        cout << endl;
+    }
+
+    cout << endl;
+
+    worker = worker0;
+    machine = machine0;
+
+    for (int i = 0; i < NP; i++)
+    {
+        // cout << "Chromosome" << i << endl;
         Chromosome v = mutation(chromosome[i]);
         Chromosome u = crossover(chromosome[i], v);
 
@@ -1246,8 +1428,8 @@ JobShop::Chromosome JobShop::mutation(Chromosome x)
     v = x + diff1 + diff2;
 
     // normalization (ope_sequence)
-    float max_sequence = max_element(begin(v.ope_sequence), end(v.ope_sequence))->sequence;
-    float min_sequence = min_element(begin(v.ope_sequence), end(v.ope_sequence))->sequence;
+    double max_sequence = max_element(begin(v.ope_sequence), end(v.ope_sequence))->sequence;
+    double min_sequence = min_element(begin(v.ope_sequence), end(v.ope_sequence))->sequence;
     for (int i = 0; i < seq_size; i++)
     {
         v.ope_sequence[i].sequence = (v.ope_sequence[i].sequence - min_sequence) / (max_sequence - min_sequence);
@@ -1272,11 +1454,11 @@ JobShop::Chromosome JobShop::mutation(Chromosome x)
     v.sort_sequence = sort_ope_sequence(v.ope_sequence);
     v.resource_asg = asg_resource(v.resource_asg);
     get_schedule(v.sort_sequence, v.resource_asg);
-    v.F = objective();
-
-    /*
+    v.F = objective(v.resource_asg);
     worker = worker0;
     machine = machine0;
+
+    /*
     cout << "F:" << v.F << endl;
     cout << "Operation schedule" << endl;
     for (int j = 0; j < seq_size; j++)
@@ -1340,11 +1522,11 @@ JobShop::Chromosome JobShop::crossover(Chromosome x0, Chromosome x1)
     u.sort_sequence = sort_ope_sequence(u.ope_sequence);
     u.resource_asg = asg_resource(u.resource_asg);
     get_schedule(u.sort_sequence, u.resource_asg);
-    u.F = objective();
-
-    /*
+    u.F = objective(u.resource_asg);
     worker = worker0;
     machine = machine0;
+
+    /*
     cout << "F:" << u.F << endl;
     cout << "Operation schedule" << endl;
     for (int j = 0; j < seq_size; j++)
@@ -1366,6 +1548,92 @@ JobShop::Chromosome JobShop::crossover(Chromosome x0, Chromosome x1)
     */
 
     return u;
+}
+
+void JobShop::adjust_shifts()
+{
+    /*
+    cout << "Chromosomes" << endl;
+    for (int i = 0; i < NP; i++)
+    {
+        cout << "Chromosome number:" << i << endl;
+        cout << "F:" << chromosome[i].F << endl;
+        cout << "Operation schedule" << endl;
+        for (int j = 0; j < seq_size; j++)
+        {
+            cout << "(" << chromosome[i].sort_sequence[j].job_num << "," << chromosome[i].sort_sequence[j].ope_num << ") : " << chromosome[i].sort_sequence[j].sequence;
+            cout << endl;
+        }
+        cout << "Resource group assignment" << endl;
+        for (int j = 0; j < job_size; j++)
+        {
+            for (int k = 0; k < job[j].ope_size; k++)
+            {
+                cout << "(" << j << "," << k << ") : " << chromosome[i].resource_asg[j][k].assignment << " | (" << chromosome[i].resource_asg[j][k].machine_num << "," << chromosome[i].resource_asg[j][k].worker_num << ")";
+                cout << endl;
+            }
+        }
+        cout << "processing completion time" << endl;
+        get_schedule(chromosome[i].sort_sequence, chromosome[i].resource_asg);
+        for (int j = 0; j < job_size; j++)
+        {
+            cout << "maxpT" << job[j].operation[job[j].ope_size - 1].pT;
+            cout << endl;
+        }
+        worker = worker0;
+        machine = machine0;
+        cout << endl;
+    }
+    */
+
+    /*
+    Chromosome chromosome_best = *min_element(begin(chromosome), end(chromosome));
+    get_schedule(chromosome_best.sort_sequence, chromosome_best.resource_asg);
+
+    cout << "Best Chromosome after" << endl;
+
+    cout << "F:" << chromosome_best.F << endl;
+
+    cout << "Operation schedule" << endl;
+    for (int j = 0; j < seq_size; j++)
+    {
+        cout << "(" << chromosome_best.sort_sequence[j].job_num << "," << chromosome_best.sort_sequence[j].ope_num << ") : " << chromosome_best.sort_sequence[j].sequence;
+        cout << endl;
+    }
+    cout << "Resource group assignment" << endl;
+    for (int j = 0; j < job_size; j++)
+    {
+        for (int k = 0; k < job[j].ope_size; k++)
+        {
+            cout << "(" << j << "," << k << ") : " << chromosome_best.resource_asg[j][k].assignment << " | (" << chromosome_best.resource_asg[j][k].machine_num << "," << chromosome_best.resource_asg[j][k].worker_num << ")";
+            cout << endl;
+        }
+    }
+
+    cout << "processing completion time" << endl;
+    for (int j = 0; j < job_size; j++)
+    {
+        cout << "maxpT" << job[j].operation[job[j].ope_size - 1].pT;
+        cout << endl;
+    }
+
+    cout << endl;
+    */
+
+    // best chromosomes
+    vector<Chromosome> chromosome_best;
+
+    float F_best = min_element(begin(chromosome), end(chromosome))->F;
+
+    for (int i = 0; i < NP; i++)
+    {
+        if (chromosome[i].F == F_best)
+        {
+            chromosome_best.push_back(chromosome[i]);
+        }
+    }
+
+
 }
 
 int main()
