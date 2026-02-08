@@ -1,0 +1,223 @@
+job_size /
+3 
+
+[job0]
+job_priority release_time delivery_time ope_size /
+1            0            2500          3        
+
+ope0:
+resource_type worker_size worker_num machine_size machine_num ope_worker_size ope_worker_num  /
+1             4           0 1 2 3    2            0           3               0 1 2          
+                                                  1           2               0 3 
+
+ope1:
+resource_type worker_size worker_num /
+0             2           6 7 
+
+ope2:
+resource_type worker_size worker_num machine_size machine_num ope_worker_size ope_worker_num  /
+1             3           1 2 4      2            0           2               1 4 
+                                                  2           2               2 4 
+
+[job1]
+job_priority release_time delivery_time ope_size /
+0            0            3000          4
+
+ope0:
+resource_type worker_size worker_num /
+0             2           6 7 
+
+ope1:
+resource_type worker_size worker_num machine_size machine_num ope_worker_size ope_worker_num  /
+1             3           0 3 5      2            1           2               0 3  
+                                                  4           1               5 
+
+ope2:
+resource_type worker_size worker_num /
+0             2           7 8 
+
+ope3:
+resource_type worker_size worker_num machine_size machine_num ope_worker_size ope_worker_num  /
+1             3           2 3 5      2            3           2               2 3  
+                                                  4           2               3 5
+
+[job2] new!!
+job_priority release_time delivery_time ope_size /
+1            2000         5000          4
+
+ope0:
+resource_type worker_size worker_num /
+0             2           6 7 
+
+ope1:
+resource_type worker_size worker_num machine_size machine_num ope_worker_size ope_worker_num  /
+1             3           0 3 5      2            1           2               0 3  
+                                                  4           1               5 
+
+ope2:
+resource_type worker_size worker_num /
+0             2           7 8 
+
+ope3:
+resource_type worker_size worker_num machine_size machine_num ope_worker_size ope_worker_num  /
+1             3           2 3 5      2            3           2               2 3  
+                                                  4           2               3 5
+
+worker_size /
+9
+
+以降をcsvファイルとして扱う？
+[shift of worker]
+working day / 7
+
+overtime day:0    1    2    3    4    5              6
+worker0 /    0    120  0    120  0    0              0
+worker1 /    0    0    0    0    0    0              0
+worker2 /    60   0    0    0    0    0              300 9180 9540
+worker3 /    0    0    0    0    0    0              0
+worker4 /    0    0    240  0    0    0              0
+worker5 /    60   60   60   60   0    0              360 9240 9600
+worker6 /    0    0    0    0    0    0              0
+worker7 /    0    0    0    0    120  300 7980 8280  0
+worker8 /    0    0    0    0    60   0              0
+
+[unavailable periods of worker] (Break time)
+worker0 / 5   720 780  2160 2220  3600 3660  5040 5100  6480 6540
+worker1 / 5   720 780  2160 2220  3600 3660  5040 5100  6480 6540
+worker2 / 6   720 780  2160 2220  3600 3660  5040 5100  6480 6540  9360 9420
+worker3 / 5   720 780  2160 2220  3600 3660  5040 5100  6480 6540
+worker4 / 5   720 780  2160 2220  3600 3660  5040 5100  6480 6540
+worker5 / 5   720 780  2160 2220  3600 3660  5040 5100  6480 6540
+worker6 / 5   720 780  2160 2220  3600 3660  5040 5100  6480 6540
+worker7 / 5   720 780  2160 2220  3600 3660  5040 5100  6480 6540
+worker8 / 5   720 780  2160 2220  3600 3660  5040 5100  6480 6540
+
+[the setup time of each operation is processed by each worker]
+operation:job0_ope0 job0_ope1 job0_ope2 job1_ope0 job1_ope1 job1_ope2 job1_ope3
+worker0 / 23        7         8         19        7         7         11
+worker1 / 13        6         7         3         4         20        23
+worker2 / 41        6         12        9         8         45        67
+worker3 / 23        10        2         30        13        5         11
+worker4 / 43        11        12        11        4         7         18
+worker5 / 31        20        44        61        32        71        51
+worker6 / 10        21        43        26        37        23        11
+worker7 / 10        11        5         21        11        23        14
+worker8 / 53        26        4         32        7         7         24
+
+[the processing time of each operation is processed by each worker]
+operation:job0_ope0 job0_ope1 job0_ope2 job1_ope0 job1_ope1 job1_ope2 job1_ope3
+worker0 / 530       700       850       931       200       770       511
+worker1 / 531       600       730       939       200       120       211
+worker2 / 542       690       127       844       200       245       167
+worker3 / 539       210       412       944       200       590       231
+worker4 / 543       231       212       944       200       790       218
+worker5 / 511       201       440       705       200       990       323
+worker6 / 501       321       443       893       200       223       890
+worker7 / 500       350       560       902       200       223       199
+worker8 / 525       200       450       833       200       319       580
+
+machine_size /
+5
+
+[unavailable periods of machine]
+machine0 / 1   1020 1140
+machine1 / 1   3600 4000
+machine2 / 2   10 100  240 450
+machine3 / 2   200 700  3000 4000
+machine4 / 4   20 210  300 440  700 1000 2000 3000
+
+[the setup time of each operation is processed on each machine by worker]
+operation:            job0_ope0 job0_ope1 job0_ope2 job1_ope0 job1_ope1 job1_ope2 job1_ope3
+machine0 by worker0 / 23        11        38        19        27        47        11
+         by worker1 / 13        16        17        31        24        20        23
+         by worker2 / 41        26        12        12        18        45        67
+         by worker3 / 23        23        21        30        13        15        11
+         by worker4 / 43        11        12        9         34        7         18
+         by worker5 / 31        20        44        61        32        71        51
+         by worker6 / 10        21        43        26        37        23        11
+         by worker7 / 10        11        15        21        11        23        14
+         by worker8 / 53        26        24        32        19        32        29
+machine1 by worker0 / 23        11        38        19        27        47        11
+         by worker1 / 13        16        17        31        24        20        23
+         by worker2 / 41        26        12        12        18        45        67
+         by worker3 / 23        23        21        30        13        15        11
+         by worker4 / 43        11        12        9         34        7         18
+         by worker5 / 31        20        44        61        32        71        51
+         by worker6 / 10        21        43        26        37        23        11
+         by worker7 / 10        11        15        21        11        23        14
+         by worker8 / 53        26        24        32        19        32        29
+machine2 by worker0 / 23        11        38        19        27        47        11
+         by worker1 / 13        16        17        31        24        20        23
+         by worker2 / 41        26        12        12        18        45        67
+         by worker3 / 23        23        21        30        13        15        11
+         by worker4 / 43        11        12        9         34        7         18
+         by worker5 / 31        20        44        61        32        71        51
+         by worker6 / 10        21        43        26        37        23        11
+         by worker7 / 10        11        15        21        11        23        14
+         by worker8 / 53        26        24        32        19        32        29
+machine3 by worker0 / 23        11        38        19        27        47        11
+         by worker1 / 13        16        17        31        24        20        23
+         by worker2 / 41        26        12        12        18        45        67
+         by worker3 / 23        23        21        30        13        15        11
+         by worker4 / 43        11        12        9         34        7         18
+         by worker5 / 31        20        44        61        32        71        51
+         by worker6 / 10        21        43        26        37        23        11
+         by worker7 / 10        11        15        21        11        23        14
+         by worker8 / 53        26        24        32        19        32        29
+machine4 by worker0 / 23        11        38        19        27        47        11
+         by worker1 / 13        16        17        31        24        20        23
+         by worker2 / 41        26        12        12        18        45        67
+         by worker3 / 23        23        21        30        13        15        11
+         by worker4 / 43        11        12        9         34        7         18
+         by worker5 / 31        20        44        61        32        71        51
+         by worker6 / 10        21        43        26        37        23        11
+         by worker7 / 10        11        15        21        11        23        14
+         by worker8 / 53        26        24        32        19        32        29
+
+[the processing time of each operation is processed on each machine by worker]
+operation:            job0_ope0 job0_ope1 job0_ope2 job1_ope0 job1_ope1 job1_ope2 job1_ope3
+machine0 by worker0 / 200       410       380       290       270       470       110
+         by worker1 / 200       360       170       310       240       200       230
+         by worker2 / 200       260       120       320       480       450       670
+         by worker3 / 200       230       210       300       330       550       611
+         by worker4 / 200       210       420       900       340       547       418
+         by worker5 / 200       200       440       610       320       710       510
+         by worker6 / 200       721       443       326       437       323       511
+         by worker7 / 200       211       315       321       111       323       114
+         by worker8 / 200       326       224       332       219       232       229
+machine1 by worker0 / 200       211       338       719       527       347       311
+         by worker1 / 200       716       517       531       424       420       323
+         by worker2 / 200       726       512       812       918       450       367
+         by worker3 / 200       423       321       430       513       515       311
+         by worker4 / 200       411       512       519       534       217       518
+         by worker5 / 200       320       444       561       332       271       451
+         by worker6 / 200       321       443       326       537       523       311
+         by worker7 / 200       411       515       421       311       423       314
+         by worker8 / 200       426       524       332       319       432       529
+machine2 by worker0 / 200       411       338       419       327       447       311
+         by worker1 / 200       716       417       131       224       320       223
+         by worker2 / 200       226       212       212       218       245       267
+         by worker3 / 200       423       421       430       313       315       511
+         by worker4 / 200       411       412       319       234       237       118
+         by worker5 / 200       320       344       361       332       771       351
+         by worker6 / 200       321       543       326       237       123       711
+         by worker7 / 200       211       315       321       311       323       314
+         by worker8 / 200       326       324       332       519       232       329
+machine3 by worker0 / 200       311       338       219       427       347       211
+         by worker1 / 200       216       317       331       324       320       423
+         by worker2 / 200       226       312       312       318       445       367
+         by worker3 / 200       323       421       230       313       415       511
+         by worker4 / 200       611       212       219       334       217       518
+         by worker5 / 200       220       344       461       332       471       551
+         by worker6 / 200       221       343       326       437       423       311
+         by worker7 / 200       411       415       321       311       323       314
+         by worker8 / 200       326       324       332       419       332       229
+machine4 by worker0 / 200       311       238       319       327       347       311
+         by worker1 / 200       416       517       331       324       420       423
+         by worker2 / 200       226       412       512       118       645       567
+         by worker3 / 200       423       321       430       313       315       311
+         by worker4 / 200       311       212       619       334       247       318
+         by worker5 / 200       320       344       361       432       371       451
+         by worker6 / 200       421       343       326       337       223       311
+         by worker7 / 200       411       415       421       311       223       214
+         by worker8 / 200       226       424       532       519       332       229

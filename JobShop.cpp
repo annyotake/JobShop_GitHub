@@ -14,12 +14,12 @@ using namespace std;
 #define HP 1
 #define LP 0
 #define MAX_TIME 525600 // one year
+#define input "input1.txt"
 
 /*　
 やること
 ・データ量を増やす
 ・シフトの調整
-・calc_overtime(), エラーの原因:どのchromosomeのope_sequenceとresource_asgであるかを指定していない
 */
 
 class JobShop
@@ -29,16 +29,22 @@ public:
     JobShop();
 
     // parameters
-    int NP = 500;   // population size
-    int GEN = 10;   // number of generations
-    float SF = 0.7; // mutation factor
-    float CR = 0.2; // crossover factor
+    int NP = 500;    // population size
+    int GEN = 10;    // number of generations
+    float SF = 0.7;  // mutation factor
+    float CR = 0.2;  // crossover factor
+    float ADJ = 0.5; // shift adjustment factor (forward and backward)
+    int H = 10000;   // penalty
+    float standard_time = 540;
+    vector<float> standard_shift = {480, 1020};
 
     struct Shift
     {
         float workingtime;
         vector<float> shift = {-1, -1};
         float overtime;
+        int ut_overtime_quantity;
+        vector<vector<float>> ut_overtime;
     };
 
     struct Worker
@@ -191,8 +197,6 @@ public:
 
     int job_size;
     int workingday;
-    float standard_time = 480;
-    vector<float> standard_shift = {480, 1020};
     vector<Worker> worker;
     vector<Machine> machine;
     vector<Worker> worker0;   // original worker parameters
@@ -257,7 +261,7 @@ private:
 JobShop::JobShop()
 {
     // Load a file
-    ifs.open("input.txt", ios::in);
+    ifs.open(input, ios::in);
 
     /* Production scenario Initialization */
     init_instance();
@@ -271,7 +275,7 @@ JobShop::JobShop()
     /* IDE */
     evolution();
 
-    /* Shifts adjustment */
+    /* Overtime of HP jobs reduction and Shifts adjustment */
     adjust_shifts();
 }
 
@@ -393,6 +397,19 @@ void JobShop::init_parameters()
                     worker[i].shifts[j].workingtime = worker[i].shifts[j].overtime;
                     ifs >> worker[i].shifts[j].shift[0];
                     ifs >> worker[i].shifts[j].shift[1];
+
+                    ifs >> worker[i].shifts[j].ut_overtime_quantity;
+
+                    if (worker[i].shifts[j].ut_overtime_quantity > 0)
+                    {
+                        float ut0, ut1;
+                        for (int k = 0; k < worker[i].shifts[j].ut_overtime_quantity; k++)
+                        {
+                            ifs >> ut0; // start
+                            ifs >> ut1; // end
+                            worker[i].shifts[j].ut_overtime.push_back({ut0, ut1});
+                        }
+                    }
                 }
                 else
                 {
@@ -409,7 +426,7 @@ void JobShop::init_parameters()
             }
 
             // ut (shift)
-            if (worker[i].shifts[j].shift[0] > 0 || worker[i].shifts[j].shift[1] > 0)
+            if ((worker[i].shifts[j].shift[0] > 0 || worker[i].shifts[j].shift[1] > 0) && (j % 7 != 5 && j % 7 != 6))
             {
                 if (inserted == 0)
                 {
@@ -418,7 +435,7 @@ void JobShop::init_parameters()
                 }
                 else
                 {
-                    if (worker[i].shifts[j - 1].shift[1] < 0)
+                    if (worker[i].shifts[j - 1].shift[1] < 0 || ((j - 1) % 7 == 5 || (j - 1) % 7 == 6))
                     {
                         worker[i].ut.push_back({worker[i].shifts[j - (1 + dayoff)].shift[1], worker[i].shifts[j].shift[0]});
                     }
@@ -444,7 +461,15 @@ void JobShop::init_parameters()
 
             cout << "workingtime:" << worker[i].shifts[j].workingtime
                  << " shift:" << worker[i].shifts[j].shift[0] << " " << worker[i].shifts[j].shift[1]
-                 << " overtime:" << worker[i].shifts[j].overtime << endl;
+                 << " overtime:" << worker[i].shifts[j].overtime;
+            if (worker[i].shifts[j].ut_overtime_quantity)
+            {
+                for (int k = 0; k < worker[i].shifts[j].ut_overtime_quantity; k++)
+                {
+                    cout << " ut_overtime:" << worker[i].shifts[j].ut_overtime[k][0] << " " << worker[i].shifts[j].ut_overtime[k][1];
+                }
+            }
+            cout << endl;
         }
         cout << endl;
     }
@@ -1187,10 +1212,12 @@ void JobShop::update_ut(int j, int o, int w, int m)
 
 float JobShop::objective(vector<vector<Resource_asg>> x)
 {
-    float overdue = 0;  // overdue days of LP jobs
-    float overtime = 0; // total overtime of workers for HP jobs
-    float t;            // overtime
-    float F;            // objective function
+    float overdue = 0;     // overdue days of LP jobs
+    float overtime = 0;    // total overtime of workers for HP jobs
+    float overdue_HP = 0;  // overdue days of HP jobs (penalty)
+    float overtime_LP = 0; // total overtime of workers for LP jobs (penalty)
+    float t;               // overtime
+    float F;               // objective function
 
     for (int i = 0; i < job_size; i++)
     {
@@ -1207,8 +1234,9 @@ float JobShop::objective(vector<vector<Resource_asg>> x)
                 overdue += temp;
             }
         }
+
         // calculate total overtime
-        else if (job[i].priority == HP)
+        if (job[i].priority == HP)
         {
             int temp = ceil(job[i].dT / 1440) - ceil(maxpT / 1440);
             if (temp > 0)
@@ -1224,10 +1252,27 @@ float JobShop::objective(vector<vector<Resource_asg>> x)
                 }
             }
         }
+
+        // calculate overdue_HP (penalty)
+        if (job[i].priority == HP)
+        {
+            int temp = ceil(maxpT / 1440) - ceil(job[i].dT / 1440);
+            if (temp > 0)
+            {
+                overdue_HP += temp;
+            }
+        }
+
+        // calculate overtime_LP
+        if (job[i].priority == LP)
+        {
+            t = calc_overtime(x, i);
+            overtime_LP += floor(t / 1440);
+        }
     }
 
     // calculate F
-    F = overdue + overtime;
+    F = overdue + overtime + overdue_HP * H + overtime_LP * H;
 
     return F;
 }
@@ -1332,75 +1377,6 @@ void JobShop::gene_chromosomes(int i)
 
 void JobShop::evolution()
 {
-    /*
-    cout << "Chromosomes" << endl;
-    for (int i = 0; i < NP; i++)
-    {
-        cout << "Chromosome number:" << i << endl;
-        cout << "F:" << chromosome[i].F << endl;
-        cout << "Operation schedule" << endl;
-        for (int j = 0; j < seq_size; j++)
-        {
-            cout << "(" << chromosome[i].ope_sequence[j].job_num << "," << chromosome[i].ope_sequence[j].ope_num << ") : " << chromosome[i].ope_sequence[j].sequence;
-            cout << endl;
-        }
-        cout << "Resource group assignment" << endl;
-        for (int j = 0; j < job_size; j++)
-        {
-            for (int k = 0; k < job[j].ope_size; k++)
-            {
-                cout << "(" << j << "," << k << ") : " << chromosome[i].resource_asg[j][k].assignment << " | (" << chromosome[i].resource_asg[j][k].machine_num << "," << chromosome[i].resource_asg[j][k].worker_num << ")";
-                cout << endl;
-            }
-        }
-        cout << "processing completion time" << endl;
-        get_schedule(chromosome[i].sort_sequence, chromosome[i].resource_asg);
-        for (int j = 0; j < job_size; j++)
-        {
-            cout << "maxpT" << job[j].operation[job[j].ope_size - 1].pT;
-            cout << endl;
-        }
-        worker = worker0;
-        machine = machine0;
-        cout << endl;
-    }
-    */
-
-    Chromosome chromosome_best = *min_element(begin(chromosome), end(chromosome));
-    get_schedule(chromosome_best.sort_sequence, chromosome_best.resource_asg);
-
-    cout << "Best Chromosome before" << endl;
-    cout << "F:" << chromosome_best.F << endl;
-
-    cout << "Operation schedule" << endl;
-    for (int j = 0; j < seq_size; j++)
-    {
-        cout << "(" << chromosome_best.sort_sequence[j].job_num << "," << chromosome_best.sort_sequence[j].ope_num << ") : " << chromosome_best.sort_sequence[j].sequence;
-        cout << endl;
-    }
-
-    cout << "Resource group assignment" << endl;
-    for (int j = 0; j < job_size; j++)
-    {
-        for (int k = 0; k < job[j].ope_size; k++)
-        {
-            cout << "(" << j << "," << k << ") : " << chromosome_best.resource_asg[j][k].assignment << " | (" << chromosome_best.resource_asg[j][k].machine_num << "," << chromosome_best.resource_asg[j][k].worker_num << ")";
-            cout << endl;
-        }
-    }
-
-    cout << "processing completion time" << endl;
-    for (int j = 0; j < job_size; j++)
-    {
-        cout << "maxpT" << job[j].operation[job[j].ope_size - 1].pT;
-        cout << endl;
-    }
-
-    cout << endl;
-
-    worker = worker0;
-    machine = machine0;
-
     for (int i = 0; i < NP; i++)
     {
         // cout << "Chromosome" << i << endl;
@@ -1458,27 +1434,6 @@ JobShop::Chromosome JobShop::mutation(Chromosome x)
     worker = worker0;
     machine = machine0;
 
-    /*
-    cout << "F:" << v.F << endl;
-    cout << "Operation schedule" << endl;
-    for (int j = 0; j < seq_size; j++)
-    {
-        cout << "(" << v.sort_sequence[j].job_num << "," << v.sort_sequence[j].ope_num << ") : " << v.sort_sequence[j].sequence;
-        cout << endl;
-    }
-    cout << "Resource group assignment" << endl;
-    for (int j = 0; j < job_size; j++)
-    {
-        for (int k = 0; k < job[j].ope_size; k++)
-        {
-            cout << "(" << j << "," << k << ") : " << v.resource_asg[j][k].assignment << " | (" << v.resource_asg[j][k].machine_num << "," << v.resource_asg[j][k].worker_num << ")";
-            cout << endl;
-        }
-    }
-
-    cout << endl;
-    */
-
     return v;
 }
 
@@ -1526,175 +1481,108 @@ JobShop::Chromosome JobShop::crossover(Chromosome x0, Chromosome x1)
     worker = worker0;
     machine = machine0;
 
-    /*
-    cout << "F:" << u.F << endl;
-    cout << "Operation schedule" << endl;
-    for (int j = 0; j < seq_size; j++)
-    {
-        cout << "(" << u.sort_sequence[j].job_num << "," << u.sort_sequence[j].ope_num << ") : " << u.sort_sequence[j].sequence;
-        cout << endl;
-    }
-    cout << "Resource group assignment" << endl;
-    for (int j = 0; j < job_size; j++)
-    {
-        for (int k = 0; k < job[j].ope_size; k++)
-        {
-            cout << "(" << j << "," << k << ") : " << u.resource_asg[j][k].assignment << " | (" << u.resource_asg[j][k].machine_num << "," << u.resource_asg[j][k].worker_num << ")";
-            cout << endl;
-        }
-    }
-
-    cout << endl;
-    */
-
     return u;
 }
 
 void JobShop::adjust_shifts()
 {
-    /*
-    cout << "Chromosomes" << endl;
-    for (int i = 0; i < NP; i++)
-    {
-        cout << "Chromosome number:" << i << endl;
-        cout << "F:" << chromosome[i].F << endl;
-        cout << "Operation schedule" << endl;
-        for (int j = 0; j < seq_size; j++)
-        {
-            cout << "(" << chromosome[i].sort_sequence[j].job_num << "," << chromosome[i].sort_sequence[j].ope_num << ") : " << chromosome[i].sort_sequence[j].sequence;
-            cout << endl;
-        }
-        cout << "Resource group assignment" << endl;
-        for (int j = 0; j < job_size; j++)
-        {
-            for (int k = 0; k < job[j].ope_size; k++)
-            {
-                cout << "(" << j << "," << k << ") : " << chromosome[i].resource_asg[j][k].assignment << " | (" << chromosome[i].resource_asg[j][k].machine_num << "," << chromosome[i].resource_asg[j][k].worker_num << ")";
-                cout << endl;
-            }
-        }
-        cout << "processing completion time" << endl;
-        get_schedule(chromosome[i].sort_sequence, chromosome[i].resource_asg);
-        for (int j = 0; j < job_size; j++)
-        {
-            cout << "maxpT" << job[j].operation[job[j].ope_size - 1].pT;
-            cout << endl;
-        }
-        worker = worker0;
-        machine = machine0;
-        cout << endl;
-    }
-    */
-
-    /*
-    Chromosome chromosome_best = *min_element(begin(chromosome), end(chromosome));
-    get_schedule(chromosome_best.sort_sequence, chromosome_best.resource_asg);
-
-    cout << "Best Chromosome after" << endl;
-
-    cout << "F:" << chromosome_best.F << endl;
-
-    cout << "Operation schedule" << endl;
-    for (int j = 0; j < seq_size; j++)
-    {
-        cout << "(" << chromosome_best.sort_sequence[j].job_num << "," << chromosome_best.sort_sequence[j].ope_num << ") : " << chromosome_best.sort_sequence[j].sequence;
-        cout << endl;
-    }
-    cout << "Resource group assignment" << endl;
-    for (int j = 0; j < job_size; j++)
-    {
-        for (int k = 0; k < job[j].ope_size; k++)
-        {
-            cout << "(" << j << "," << k << ") : " << chromosome_best.resource_asg[j][k].assignment << " | (" << chromosome_best.resource_asg[j][k].machine_num << "," << chromosome_best.resource_asg[j][k].worker_num << ")";
-            cout << endl;
-        }
-    }
-
-    cout << "processing completion time" << endl;
-    for (int j = 0; j < job_size; j++)
-    {
-        cout << "maxpT" << job[j].operation[job[j].ope_size - 1].pT;
-        cout << endl;
-    }
-
-    cout << endl;
-    */
-
     // best chromosomes
-    vector<Chromosome> chromosome_best;
-
+    vector<Chromosome> chromosomes_best;
     float F_best = min_element(begin(chromosome), end(chromosome))->F;
 
     for (int i = 0; i < NP; i++)
     {
         if (chromosome[i].F == F_best)
         {
-            chromosome_best.push_back(chromosome[i]);
+            chromosomes_best.push_back(chromosome[i]);
         }
     }
 
+    // calculate overdue of HP jobs
+    vector<float> overdue_HPs(chromosomes_best.size(), 0);
 
+    for (int i = 0; i < chromosomes_best.size(); i++)
+    {
+        get_schedule(chromosomes_best[i].sort_sequence, chromosomes_best[i].resource_asg);
+
+        for (int j = 0; j < job_size; j++)
+        {
+            if (job[j].priority == HP && job[j].operation[job[j].ope_size - 1].pT > job[j].dT)
+            {
+                overdue_HPs[i] += job[j].operation[job[j].ope_size - 1].pT - job[j].dT;
+            }
+        }
+
+        worker = worker0;
+        machine = machine0;
+    }
+
+    /*
+    // adjust shift of worker
+    vector<vector<Worker>> worker_adjusted(chromosomes_best.size(), worker0);
+    vector<vector<Machine>> machine_adjusted(chromosomes_best.size(), machine0);
+
+    overdue_HPs.assign(overdue_HPs.size(), 0);
+
+    for (int i = 0; i < chromosomes_best.size(); i++)
+    {
+        worker = worker_adjusted[i];
+        machine = machine_adjusted[i];
+
+        get_schedule(chromosomes_best[i].sort_sequence, chromosomes_best[i].resource_asg);
+
+        for (int j = 0; j < job_size; j++)
+        {
+            if (job[j].priority == HP && job[j].operation[job[j].ope_size - 1].pT > job[j].dT)
+            {
+                // まずは残業可能時間から埋める。その後残業時間を生成する。
+                if (get_rand(0.0, 1.0) < ADJ) // forward
+                {
+                    for (int o = 0; o < job[j].ope_size; o++)
+                    {
+                        if (job[j].operation[o].resource.type == 0)
+                        {
+                            for (int d = 0; d < workingday; d++)
+                            {
+                                if (job[j].operation[o].sT < (d + 1) * 1440 && (d + 1) * 1440 < job[j].operation[o].pT)
+                                {
+                                    worker_adjusted[i][chromosomes_best[i].resource_asg[j][o].worker_num]
+                                }
+                            }
+                        }
+                        else if (job[j].operation[o].resource.type == 1)
+                        {
+                            // chromosomes_best[i].resource_asg[j][o].worker_num, chromosomes_best[i].resource_asg[j][o].machine_num
+                        }
+                    }
+                }
+                else // backward
+                {
+                }
+            }
+        }
+
+        worker = worker_adjusted[i];
+        machine = machine_adjusted[i];
+
+        get_schedule(chromosomes_best[i].sort_sequence, chromosomes_best[i].resource_asg);
+
+        for (int j = 0; j < job_size; j++)
+        {
+            if (job[j].priority == HP && job[j].operation[job[j].ope_size - 1].pT > job[j].dT)
+            {
+                overdue_HPs[i] += job[j].operation[job[j].ope_size - 1].pT - job[j].dT;
+            }
+        }
+    }
+
+    Chromosome chromosome_best = *min_element(begin(chromosomes_best), end(chromosomes_best));
+    */
 }
 
 int main()
 {
     JobShop jobShop;
-
-    /*
-    cout << "Operation sequence vector" << endl;
-    for (int i = 0; i < jobShop.seq_size; i++)
-    {
-        cout << "(" << jobShop.ope_x0[i].job_num << "," << jobShop.ope_x0[i].ope_num << ") : " << jobShop.ope_x0[i].sequence;
-        cout << endl;
-    }
-
-    cout << "Operation schedule" << endl;
-    for (int i = 0; i < jobShop.job_size; i++)
-    {
-        for (int j = 0; j < jobShop.job[i].ope_size; j++)
-        {
-            cout << "job" << i << "ope" << j << endl;
-            cout << "sT:" << jobShop.job[i].operation[j].sT << " cT:" << jobShop.job[i].operation[j].cT << " pT:" << jobShop.job[i].operation[j].pT;
-            cout << endl;
-        }
-    }
-
-    cout << "Resource group assignment" << endl;
-    for (int i = 0; i < jobShop.job_size; i++)
-    {
-        for (int j = 0; j < jobShop.job[i].ope_size; j++)
-        {
-            cout << "(" << i << "," << j << ") : " << jobShop.resource_x0[i][j].assignment << " | (" << jobShop.resource_x0[i][j].machine_num << "," << jobShop.resource_x0[i][j].worker_num << ")";
-            cout << endl;
-        }
-    }
-    */
-
-    /*
-    cout << "Chromosomes" << endl;
-    for (int i = 0; i < jobShop.NP; i++)
-    {
-        cout << "Chromosome number:" << i << endl;
-        cout << "F:" << jobShop.chromosome[i].F << endl;
-        cout << "Operation schedule" << endl;
-        for (int j = 0; j < jobShop.seq_size; j++)
-        {
-            cout << "(" << jobShop.chromosome[i].ope_sequence[j].job_num << "," << jobShop.chromosome[i].ope_sequence[j].ope_num << ") : " << jobShop.chromosome[i].ope_sequence[j].sequence;
-            cout << endl;
-        }
-        cout << "Resource group assignment" << endl;
-        for (int j = 0; j < jobShop.job_size; j++)
-        {
-            for (int k = 0; k < jobShop.job[j].ope_size; k++)
-            {
-                cout << "(" << j << "," << k << ") : " << jobShop.chromosome[i].resource_asg[j][k].assignment << " | (" << jobShop.chromosome[i].resource_asg[j][k].machine_num << "," << jobShop.chromosome[i].resource_asg[j][k].worker_num << ")";
-                cout << endl;
-            }
-        }
-
-        cout << endl;
-    }
-    */
 
     return 0;
 }
