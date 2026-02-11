@@ -8,13 +8,14 @@
 #include <ctime>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
 
 using namespace std;
 
 #define HP 1
 #define LP 0
 #define MAX_TIME 525600 // one year
-#define input "input2.txt"
+#define input "input1.txt"
 
 class JobShop
 {
@@ -1382,16 +1383,19 @@ void JobShop::gene_chromosomes(int i)
 
 void JobShop::evolution()
 {
-    for (int i = 0; i < NP; i++)
+    for (int g = 0; g < GEN; g++)
     {
-        // cout << "Chromosome" << i << endl;
-        Chromosome v = mutation(chromosome[i]);
-        Chromosome u = crossover(chromosome[i], v);
-
-        // selection operation
-        if (u < chromosome[i])
+        for (int i = 0; i < NP; i++)
         {
-            chromosome[i] = u;
+            // cout << "Chromosome" << i << endl;
+            Chromosome v = mutation(chromosome[i]);
+            Chromosome u = crossover(chromosome[i], v);
+
+            // selection operation
+            if (u < chromosome[i])
+            {
+                chromosome[i] = u;
+            }
         }
     }
 }
@@ -1511,7 +1515,7 @@ void JobShop::adjust_shifts()
 
     // adjustment on available overtime
     int count = 0;
-    while (count < ADJ || (count >= ADJ && *min_element(begin(overdue_HPs), end(overdue_HPs)) > 0))
+    while (count < ADJ && (*max_element(begin(overdue_HPs), end(overdue_HPs)) > 0))
     {
         adjust_overtime(chromosomes_best);
 
@@ -1525,16 +1529,27 @@ void JobShop::adjust_shifts()
             chromosomes_best[i].F = objective(chromosomes_best[i].resource_asg);
         }
 
-        cout << count << endl;
-
         count++;
     }
 
-    // Chromosome chromosome_best = *min_element(begin(chromosomes_best), end(chromosomes_best));
-    int index = distance(overdue_HPs.begin(), min_element(overdue_HPs.begin(), overdue_HPs.end()));
-    Chromosome chromosome_best = chromosomes_best[index];
+    vector<Chromosome> chromosomes_overdue_best;
+    float overdue_best = *min_element(overdue_HPs.begin(), overdue_HPs.end());
+    vector<int> index;
 
-    worker = workers_adjusted[index];
+    for (int i = 0; i < overdue_HPs.size(); i++)
+    {
+        if (overdue_HPs[i] == overdue_best)
+        {
+            index.push_back(i);
+            chromosomes_overdue_best.push_back(chromosomes_best[i]);
+            //cout << "overdue:" << overdue_HPs[i] << " F:" << chromosomes_best[i].F << endl;
+        }
+    }
+
+    Chromosome chromosome_best = *min_element(begin(chromosomes_overdue_best), end(chromosomes_overdue_best));
+    int index_best = distance(chromosomes_overdue_best.begin(), min_element(begin(chromosomes_overdue_best), end(chromosomes_overdue_best)));
+
+    worker = workers_adjusted[index[index_best]];
     machine = machine0;
     get_schedule(chromosome_best.sort_sequence, chromosome_best.resource_asg);
 
@@ -1565,7 +1580,7 @@ void JobShop::adjust_shifts()
         cout << "worker" << j << ":";
         for (int d = 0; d < workingday; d++)
         {
-            cout << workers_adjusted[index][j].shifts[d].shift[0] << " " << workers_adjusted[index][j].shifts[d].shift[1] << "/";
+            cout << workers_adjusted[index[index_best]][j].shifts[d].shift[0] << " " << workers_adjusted[index[index_best]][j].shifts[d].shift[1] << "/";
         }
         cout << endl;
     }
@@ -1708,7 +1723,14 @@ void JobShop::adjust_ut(int i)
 
 int main()
 {
+    auto start = chrono::high_resolution_clock::now();
+
     JobShop jobShop;
+
+    auto end = chrono::high_resolution_clock::now();
+
+    auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
+    cout << duration.count() << "ms\n";
 
     return 0;
 }

@@ -6,6 +6,10 @@
 \usepackage{url}
 \usepackage{kit-is-b}
 \usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
 \author{竹下　拓希}
 \idnumber{22122031}
 \deadline{2026}{2}{13} % 提出日{西暦年}{月}{日}
@@ -102,7 +106,7 @@ HPジョブが納期内に完了していない場合に，
 \chapter{差分進化}
 \section{概要}
 DEは1995年にStornとPriceによって提案された
-実数空間における最適化アルゴリズムであり\cite{Y2012}，
+実数空間における最適化アルゴリズムであり\cite{Y214}，
 遺伝的アルゴリズム（Genetic Algorithm, GA）などの
 進化的アルゴリズム（Evolutionary Algorithm, EA）の１つである．
 DEは集団サイズ$NP$，スケーリングファクター$SF$，交叉率$CR$の
@@ -111,7 +115,7 @@ DEは集団サイズ$NP$，スケーリングファクター$SF$，交叉率$CR$
 比較的単純で効率的なアルゴリズムとなっている．
 そのため，様々な最適化問題に適用されており，
 スケジューリングに関する研究においても 
-DEを用いた解法が利用されている\cite{Y122}\cite{Y2012}\cite{Y226}\cite{Y213}\cite{Y971}．
+DEを用いた解法が利用されている\cite{Y2012}\cite{Y122}\cite{Y226}\cite{Y213}\cite{Y971}．
 
 DEにはDE/rand/1/binやDE/rand to best/1/bin，DE/best/2/binなどの
 いくつかの形式があり，各形式では突然変異の手法が異なる．
@@ -128,7 +132,7 @@ $cross$は子を生成するために使用する交叉方法を指定する．
 	\item[Step0] 初期化：$NP$個の初期個体$x_k (k = 1,2,\cdots,NP)$を探索空間$S$内に生成し，
 	             個体群$P = \{x_1,x_2,\cdots,x_{NP}\}$を構成する．
 							 世代を$G = 1$とする．
-	\item[Step1] 突然変異：世代$G$の個体群$P$における親個体$x^G_k$に対して，
+	\item[Step1] 突然変異：世代$G$の個体群$P$における各親個体$x^G_k$に対して，
 	             個体群$P$から２個体$x^G_{r1}$, $x^G_{r2}$を$x^G_k$および互いに重複しないようにランダムに選択する．
 							 また，最良個体$x^G_{best}$を選択する．
 							 そして，基本ベクトル$x^G_k$および差分ベクトル$x^G_{best}-x^G_k$, $x^G_{r1}-x^G_{r2}$から変異ベクトル$v^{G+1}_k$を
@@ -201,23 +205,20 @@ Jayaアルゴリズムである．
 IDEが優れていることが報告されている．
 
 \chapter{問題設定}
-% $t^e_j$の休日における計算式、休日はwt = otである制約、第４・５項は提案解法に回す
-
 本研究で対象とするFJSPでは，
 生産現場で行うジョブの集合を$J$，
-作業の集合を$O$とし，
-各ジョブは集合$O$を含むものとする．
-そして，各ジョブは異なる種類の作業を含むことができるが，
-作業は所定の順番で完了しなければならない．
+作業の集合を$O$とする．
+各ジョブはいくつかの作業で構成されており，
+作業は所定の順番で実行しなければならない．
 また，各ジョブに優先度が設けられており，
 高優先度のHPジョブと低優先度のLPジョブに分けられ，
 HPジョブは納期内に完了しなければならない．
 一方，LPジョブは納期内に完了しないことを許容する．
-ここで対象とする資源は機械と作業者の２つであり，
+資源は機械と作業者の２つであり，
 機械の集合を$M$，作業者の集合を$W$とする．
-各ジョブの作業は，機械と作業者または作業者のみによって実行される．
-上記の仮定を踏まえて，
-本研究で対象とするFJSPにおける制約を以下に示す．
+各作業は，機械と作業者または作業者のみによって実行される．
+
+次に，制約を以下に示す．
 
 (1) すべての機械は必ず１人の作業者を必要とする．
 
@@ -237,42 +238,54 @@ HPジョブは納期内に完了しなければならない．
 (7) 時刻0は月曜日の0時とする．
     また，時刻は分単位で扱う．
 
-(8) 標準シフトは8時～17時の9時間とする．
-    また，作業者の勤務時間は休憩時間などの作業をしていない時間も含む．
+(8) 作業者の標準シフトは8時～17時の9時間とする．
+    勤務時間は休憩時間などの作業をしていない時間も含む．
+
+本論文で特に焦点としているシフトについて説明する．
+シフトは標準シフト以外に，平日の残業シフトと休日シフトがあり，
+作業者ごとに勤務してよい希望の時間帯が与えられている．
+標準シフト以外は残業や休日出勤となるので，
+できるだけ残業・休日シフトを使わないようにする．
+しかし，もし希望の残業・休日シフトだけでは
+HPジョブが納期内に完了しないなら，さらにシフトを増やして対応する．
+このとき，休日にはシフトを増やさず，平日の残業時間を増やして対応させる．
+この余分な残業増加時間はできるだけ削減させるようにする．
 
 表4.1と表4.2で示した用語を用いて，先行研究を基に，
 本研究で対象とするFJSPを定義する．
 このFJSPを基に，
-作業者の希望を考慮しつつ，残業時間を最小化したシフトと
+作業者の希望を考慮しつつ，残業時間を最小化したシフトと，
 HPジョブを納期内に完了させ，
 LPジョブの納期からの遅延日数を最小化した生産スケジュールを作成する．
 目的関数$F$は以下の式(4.1)のように表され，
-HPジョブを納期内に完了させ，
 LPジョブの納期からの遅延日数と
 作業者の残業時間を最小化しつつ，
 作業者の希望に沿ったシフトを決定することを目的とする．
-目的関数$F$の第3項では
-残業時間が作業者の希望に沿っていない場合に
+目的関数$F$の第3項で，
+シフトが作業者の希望に沿っていない場合に
 ペナルティ係数$H$を乗じた数値を目的関数$F$に加える．
-また，式(4.2)の$t^e_j$はジョブ$j$における作業者の合計残業時間を表す．
+また，式(4.2)の$t^e_j$はジョブ$j$における残業時間を表す．
 
 \begin{equation}
 	\begin{split}
-	  F &= min \Bigg\{\sum_{j|P_j = LP} \max \left[0, \left( \left\lceil\frac{\max\limits_i(pT_{ji})}{1440}\right\rceil - \left\lceil\frac{E_j}{1440}\right\rceil \right)\right] \\
-	    &\quad + \sum_{j|P_j = HP} \max \left[0, \left(\left\lceil\frac{E_j}{1440}\right\rceil - \left\lceil\frac{\max\limits_i(pT_{ji})}{1440}\right\rceil \right)\right] \cdot \left.\frac{E_j - \max\limits_i(pT_{ji})}{t^e_j} \right|_{t^e_j > 0} \\
-			&\quad + \sum_w{\sum_d \max \left[0, \left( wt^w_d - \sigma - ot^w_d \right) \right]} \cdot H \Bigg\}
+	  \min F &= \sum_{j|P_j = LP} \max \left[0, \left( \left\lceil\frac{\max\limits_i(pT_{ji})}{1440}\right\rceil - \left\lceil\frac{E_j}{1440}\right\rceil \right)\right] \\
+	         &\quad + \sum_{j|P_j = HP} \max \left[0, \left(\left\lceil\frac{E_j}{1440}\right\rceil - \left\lceil\frac{\max\limits_i(pT_{ji})}{1440}\right\rceil \right)\right] \cdot \left.\frac{E_j - \max\limits_i(pT_{ji})}{t^e_j} \right|_{t^e_j > 0} \\
+			     &\quad + \sum_w{\sum_d \max \left[0, \left( wt^w_d - \sigma - de^w_d + ds^w_d \right) \right]} \cdot H
 	\end{split}
 \end{equation}
 
 \begin{equation}
-  t^e_j = \sum_i{\sum_w{\sum^{\left\lceil\frac{pT_{ji}}{3\sigma}\right\rceil}_{d = \left\lceil\frac{sT_{ji}}{3\sigma}\right\rceil}{x^w_{ji} \cdot \left( wt^w_d - \sigma \right)}}}
+	t^e_j = \sum_i{\sum_w{ \left( \sum_{d \in D_{ji} \cap (D \setminus HD)}{x^w_{ji} \cdot \left( wt^w_d - \sigma \right) + \sum_{d \in D_{ji} \cap (HD)}{x^w_{ji} \cdot wt^w_d}} \right) }} (\forall j)
+\end{equation}
+
+\begin{equation}
+	D_{ji} = \left\{\left\lceil\frac{sT_{ji}}{1440}\right\rceil, \cdots ,\left\lceil\frac{pT_{ji}}{1440}\right\rceil\right\}
 \end{equation}
 \\
 
 制約条件(4.3)は，すべてのLPジョブは残業が必要でないことを表す．
 制約条件(4.4)は，すべてのHPジョブは納期内に完了しなければならないことを表す．
 制約条件(4.5)は，各HPジョブの残業時間はその納期内に完了できる場合の余った時間以上でなければならないことを表す．
-                そうでない場合はそのHPジョブは残業せずに納期内に完了できることを意味する．
 制約条件(4.6)は，各ジョブの開始時刻はその開始可能時刻以降でなければならないことを表す．
 制約条件(4.7)は，集合$R^{\tau}_{ji}$の定義を示す．
 制約条件(4.8)は，すべての作業は複数の機械または作業者によって処理されることはできないことを表す．
@@ -284,25 +297,25 @@ LPジョブの納期からの遅延日数と
 								 それ以外の期間で定めることはできないことを表す．
 制約条件(4.12)は，各ジョブにおける作業を処理する順番はあらかじめ定められていることを表す．
 制約条件(4.13)は，すべての機械と作業者は同時に２つ以上の作業を処理することはできないことを表す．
-制約条件(4.14)は，$x^m_{ji}, x^w_{ji}, y^m_{j^{\prime}i^{\prime}ji}, y^w_{j^{\prime}i^{\prime}ji}$は
+制約条件(4.14)は，平日の残業時間が深夜０時までであることを表す．
+制約条件(4.15)は，休日の残業時間は希望している時間内でなければならないことを表す．
+                 これより，休日に対しては式(4.1)の目的関数$F$の第3項は必ず0となる．
+最後に，
+制約条件(4.16)は，$x^m_{ji}, x^w_{ji}, y^m_{j^{\prime}i^{\prime}ji}, y^w_{j^{\prime}i^{\prime}ji}$は
                  いずれも2値変数であることを表す．
 
 \begin{equation}
-  t^e_j = 0, \forall j \in \{j|P_j = LP\}
+  \text{subject to}　　　　　　t^e_j = 0, \forall j \in \{j|P_j = LP\}　　　　　　　　
 \end{equation}
-
 \begin{equation}
 	\max_i(pT_{ji}) \leq E_j, \forall j \in \{j|P_j = HP\}
 \end{equation}
-
 \begin{equation}
 	t^e_j \geq E_j - \max_i(pT_{ji}), \forall j \in \{j|P_j = HP\}
 \end{equation}
-
 \begin{equation}
 	\min_i(sT_{ji}) \geq B_j, \forall j \in J
 \end{equation}
-
 \begin{equation}
 	\begin{split}
 	 R^{\tau}_{ji} = 
@@ -314,7 +327,6 @@ LPジョブの納期からの遅延日数と
 	 & \forall i \in I, j \in J, m \in M, w \in W
   \end{split}
 \end{equation}
-
 \begin{equation}
 	\begin{split}
 	 &
@@ -325,7 +337,6 @@ LPジョブの納期からの遅延日数と
 	 & 　　　　　　　\forall i \in I, j \in J
   \end{split}
 \end{equation}
-
 \begin{equation}
 	\begin{split}
 	 &
@@ -338,7 +349,6 @@ LPジョブの納期からの遅延日数と
 	 & 　　　　　　　　　　　　　k_1 \leq k_2 \in K_w, k_3 \leq k_4 \in K_m
   \end{split}
 \end{equation}
-
 \begin{equation}
 	\begin{split}
 	 &
@@ -351,22 +361,19 @@ LPジョブの納期からの遅延日数と
 	 & 　　　　　　　　　　　　　k_1 \leq k_2 \in K_w, k_3 \leq k_4 \in K_m
   \end{split}
 \end{equation}
-
 \begin{equation}
 	\begin{split}
 	 &
 	 \begin{cases}
 		 sT_{ji}, cT_{ji}, pT_{ji} \notin [B_{mk_1}, E_{mk_1}] & \text{if $x^m_{ji} = 1$} \\
-		 sT_{ji}, cT_{ji}, pT_{ji} \notin [B_{mk_2}, E_{mk_2}] & \text{if $x^m_{ji} = 1$} \\
+		 sT_{ji}, cT_{ji}, pT_{ji} \notin [B_{wk_2}, E_{wk_2}] & \text{if $x^m_{ji} = 1$} \\
 	 \end{cases} \\[-10pt]
 	 & \forall i \in I, j \in J, m \in M, w \in W, k_1 \in K_m, k_2 \in K_w
   \end{split}
 \end{equation}
-
 \begin{equation}
 	sT_{j(i+1)} \geq pT_{ji}, \forall i,i+1 \in I, j \in J
 \end{equation}
-
 \begin{equation}
 	\begin{split}
 	 &
@@ -385,9 +392,14 @@ LPジョブの納期からの遅延日数と
 	 & \forall i,i^{\prime} \in I, j,j^{\prime} \in J, m \in M, w \in W, O_{j^{\prime}i^{\prime}} \ne O_{ji}
   \end{split}
 \end{equation}
-
 \begin{equation}
-	x^m_{ji}, x^w_{ji}, y^m_{j^{\prime}i^{\prime}ji}, y^w_{j^{\prime}i^{\prime}ji} \in \{0, 1\}, \forall i,i^{\prime} \in I, j,j^{\prime} \in J, m \in M, w \in W
+	wt^w_d \leq 960　\text{if $\forall w,d \in D \setminus HD$}
+\end{equation}	
+\begin{equation}
+	wt^w_d = de^w_d - ds^w_d　\text{if $\forall w,d \in HD$}
+\end{equation}	
+\begin{equation}
+	x^m_{ji}, x^w_{ji}, y^m_{jij^{\prime}i^{\prime}}, y^w_{jij^{\prime}i^{\prime}} \in \{0, 1\}, \forall i,i^{\prime} \in I, j,j^{\prime} \in J, m \in M, w \in W
 \end{equation}
 
 \begin{table}[htb]
@@ -404,9 +416,11 @@ LPジョブの納期からの遅延日数と
 		    & $N_m$は機械の人数を表す．\\ \hline
 		$d$ & 日付　$d \in D = \{1,2,\cdots,N_d\}$であり，\\
 		    & $N_d$は日数を表す．\\ \hline
+		$HD$ & 休日の集合　$d \in HD$であるとき，日付$d$は休日である．\\ \hline 
 		$wt^w_d$ & 作業者$w$の日付$d$における勤務時間　シフトによって変わる． \\ \hline
 		$\sigma$ & 標準シフトの分数　$\sigma = 9 \times 60 = 540$（分）とする． \\ \hline
-		$ot^w_d$ & 日付$d$における作業者$w$が希望する残業時間 \\ \hline
+		$ds^w_d$ & 日付$d$における作業者$w$が希望する残業開始時刻 \\ \hline
+		$de^w_d$ & 日付$d$における作業者$w$が希望する残業終了時刻 \\ \hline
 		$\tau$ & 作業の種類　$\tau \in \{0, 1\}$であり，\\
 		       & $\tau = 0$の場合，作業者のみを必要とする作業を，\\
 					 & $\tau = 1$の場合，機械と作業者を必要とする作業を表す．\\ \hline
@@ -417,11 +431,6 @@ LPジョブの納期からの遅延日数と
 		$E_j$ & ジョブ$j$の完了予定時刻（納期） \\ \hline
 		$P_j$ & ジョブ$j$の優先度　$P_j \in \{HP, LP\}$であり，\\
 		      & $HP$は優先度の高いジョブを，$LP$は優先度の低いジョブを表す．\\ \hline
-		$[B_{mk}, E_{mk}]$ & 機械$m$の利用不可期間　$k \in K_m = \{1,2,\cdots,N^k_m\}$であり，\\
-		                   & $N^k_m$は機械$m$の利用不可期間の数を表す．\\ \hline
-		$[B_{wk}, E_{wk}]$ & 作業者$w$が作業をしていないまたは他の作業をしている期間 \\
-		                   & $k \in K_w = \{1,2,\cdots,N^k_w\}$であり，\\
-		                   & $N^k_w$は作業者$w$が作業をしていない期間の数を表す．\\ \hline
   \end{tabular}
 \end{table}
 
@@ -430,6 +439,11 @@ LPジョブの納期からの遅延日数と
   \caption{各用語の意味（２）}
   \begin{tabular}{ll}  \hline
     用語 & 意味\\ \hline
+		$[B_{mk}, E_{mk}]$ & 機械$m$の利用不可期間　$k \in K_m = \{1,2,\cdots,N^k_m\}$であり，\\
+		                   & $N^k_m$は機械$m$の利用不可期間の数を表す．\\ \hline
+		$[B_{wk}, E_{wk}]$ & 作業者$w$が作業できない期間 \\
+		                   & $k \in K_w = \{1,2,\cdots,N^k_w\}$であり，\\
+		                   & $N^k_w$は作業者$w$が作業できない期間の数を表す．\\ \hline
 		$st^{mw}_{ji}$ & $\tau = 1$の場合において，作業者$w$が機械$m$によって，\\
 		               & 作業$O_{ji}$を実行するときの準備時間 \\ \hline
 		$st^w_{ji}$ & $\tau = 0$の場合において，作業者$w$が作業$O_{ji}$を実行するときの準備時間 \\ \hline
@@ -442,12 +456,12 @@ LPジョブの納期からの遅延日数と
 		$x^m_{ji}$ & $\tau = 1$の場合において，作業$O_{ji}$が機械$m$によって実行される場合，$x^m_{ji} = 1$，\\
 		           & そうでない場合，$x^m_{ji} = 0$ \\ \hline
 		$y^m_{jij^{\prime}i^{\prime}}$ & $\tau = 1$の場合において，作業$O_{ji}$が機械$m$によって実行されることが，\\
-		                               & 作業$O_{j^{\prime}i^{\prime}}$よりも先にスケジューリングされている場合，$x^m_{ji} = 1$，\\
+		                               & 作業$O_{j^{\prime}i^{\prime}}$よりも先の時刻となっている場合，$x^m_{ji} = 1$，\\
 		                               & そうでない場合，$x^m_{ji} = 0$ \\ \hline
 	  $x^w_{ji}$ & 作業者$w$が作業$O_{ji}$を実行する場合，$x^w_{ji} = 1$，\\
 		           & そうでない場合，$x^w_{ji} = 0$ \\ \hline
 		$y^w_{jij^{\prime}i^{\prime}}$ & 作業者$w$が作業$O_{ji}$を実行することが，\\
-		                               & 作業$O_{j^{\prime}i^{\prime}}$よりも先にスケジューリングされている場合，$x^w_{ji} = 1$，\\
+		                               & 作業$O_{j^{\prime}i^{\prime}}$よりも先の時刻となっている場合，$x^w_{ji} = 1$，\\
 		                               & そうでない場合，$x^w_{ji} = 0$ \\ \hline
   \end{tabular}
 \end{table}
@@ -457,7 +471,7 @@ LPジョブの納期からの遅延日数と
 本章では，先行研究におけるIDEを基にして
 第４章で定義した問題に対処する最適化法について説明する．
 この最適化法は２段階でスケジューリングを行い，
-作業者の希望を考慮しつつ，残業時間を最小化したシフトと
+作業者の希望を考慮しつつ，残業時間を最小化したシフトと，
 HPジョブを納期内に完了させ，
 LPジョブの納期からの遅延日数を最小化した生産スケジュールを作成する．
 
@@ -471,35 +485,150 @@ LPジョブの納期からの遅延日数を最小化した生産スケジュー
 各作業に割り当てる最適な資源を求める．
 このとき，HPジョブが納期内に完了しない場合は
 その納期からの遅延期間にペナルティ係数$H$を乗じた数値を目的関数$F$に加える．
-そして，このDEによって目的関数が最良である個体群を得る．
+そして，このDEによって目的関数値が最良である個体群を得る．
 
-第２段階では，第１段階で得られた目的関数が最良である個体群において，
+第２段階では，第１段階で得られた目的関数値が最良である個体群において，
 HPジョブが納期内に完了しない場合，
 HPジョブが納期内に完了するよう作業者に残業を割り当てる．
-このとき，あらかじめ定められている作業者が希望する残業時間に基づいて，
+このとき，残業時間を最小化しつつ，
+あらかじめ定められている作業者が希望する残業時間に基づいて，
 作業者の希望に沿うよう残業を割り当てる．
 また，LPジョブを担当する作業者に残業が割り当てられた場合，
-その残業は不要であるので，
+その残業は不要であるため，
 その残業日数にペナルティ係数$H$を乗じた数値を目的関数に$F$に加える．
 よって，目的関数$F$は式(5.1)の目的関数$F^{\prime}$に変更され，
-この目的関数$F^{\prime}$の下でスケジューリングを行う．
+この目的関数$F^{\prime}$の値を最小にすることを目的とする．
+\\ \\ \\ \\ \\ \\ \\
 
 \begin{equation}
 	\begin{split}
-	  F^{\prime} &= min \left\{\sum_{j|P_j = LP} \max \left[0, \left( \left\lceil\frac{\max\limits_i(pT_{ji})}{1440}\right\rceil - \left\lceil\frac{E_j}{1440}\right\rceil \right)\right]\right. \\
+	  F^{\prime} &= \sum_{j|P_j = LP} \max \left[0, \left( \left\lceil\frac{\max\limits_i(pT_{ji})}{1440}\right\rceil - \left\lceil\frac{E_j}{1440}\right\rceil \right)\right] \\
 	             &\quad + \sum_{j|P_j = HP} \max \left[0, \left(\left\lceil\frac{E_j}{1440}\right\rceil - \left\lceil\frac{\max\limits_i(pT_{ji})}{1440}\right\rceil \right)\right] \cdot \left.\frac{E_j - \max\limits_i(pT_{ji})}{t^e_j} \right|_{t^e_j > 0} \\
-			         &\quad + \sum_w{\sum_d \max \left[0, \left( wt^w_d - \sigma - ot^w_d \right) \right]} \cdot H \\
-		           &\quad + \left.\sum_{j|P_j = HP} \max \left[0, \left( \left\lceil\frac{\max\limits_i(pT_{ji})}{1440}\right\rceil - \left\lceil\frac{E_j}{1440}\right\rceil \right)\right] \cdot H + \sum_{j|P_j = LP} \left\lfloor \frac{t^e_j}{\sigma} \right\rfloor \cdot H \right\}
+			         &\quad + \sum_w{\sum_d \max \left[0, \left( wt^w_d - \sigma - de^w_d + ds^w_d \right) \right]} \cdot H \\
+		           &\quad + \sum_{j|P_j = HP} \max \left[0, \left( \left\lceil\frac{\max\limits_i(pT_{ji})}{1440}\right\rceil - \left\lceil\frac{E_j}{1440}\right\rceil \right)\right] \cdot H + \sum_{j|P_j = LP} \left\lfloor \frac{t^e_j}{\sigma} \right\rfloor \cdot H
 	\end{split}
 \end{equation}
 \\
 
-
-
 \section{アルゴリズム}
+本研究の提案解法のアルゴリズムについて述べる．
+第１段階のアルゴリズムを以下に示す．
 
+\begin{description}
+	\item[Step0] 生成する個体数やDEで用いるパラメーターなどの設定を行い，
+	             入力データを読み込む．
+	\item[Step1] 作業間の資源を割り当てる順番と各作業に割り当てる資源を管理する個体を定義する．
+	             この個体に対してDEが適用される．
+							 また，ランダムおよびヒューリスティックに初期個体群を生成する．
+	\item[Step2] 各個体に対する目的関数$F^{\prime}$の値を求める．
+	\item[Step3] 個体群に対してDEを行う．
+	             このとき，目的関数$F^{\prime}$の値がより小さい個体を選択し，
+							 次世代での進化に用いる．
+  \item[Step4] 終了条件（試行回数が規定回数を満たす）を満たしている場合，
+	             第１段階のアルゴリズムを終了し，第２段階へと移行する．
+							 満たしていない場合，Step2に戻る．
+\end{description}
+
+次に，第２段階のアルゴリズムを以下に示す．
+
+\begin{description}
+	\item[Step0] 第１段階で得られた個体群から
+	             目的関数$F^{\prime}$の値が最小である個体を選択していき，
+	             この個体をStep1で用いる．
+	             このとき，すべての制約を満たす個体が存在する場合，
+							 第２段階のアルゴリズムを終了する．
+							 そうでない場合，Step1に進む．
+	\item[Step1] 各個体において，
+	             休日出勤が可能な作業者に対して，
+							 希望する時間帯に残業を割り当てる．
+	             このとき，すべての制約を満たす個体が存在する場合，
+							 第２段階のアルゴリズムを終了する．
+							 そうでない場合，Step2に進む．
+	\item[Step2] 各個体において，
+	             納期内に完了しないHPジョブを担当する作業者に対して，
+	             残業時間を最小化しつつ，
+	             作業者の希望に沿うよう残業を割り当てる．
+	\item[Step3] Step1で更新されたシフトの下で
+	             各個体に対する目的関数$F^{\prime}$の値を求める．
+	\item[Step4] 終了条件（試行回数が規定回数をまたは各個体がすべての制約を満たす）を満たしている場合，
+	             Step4に進む．
+							 満たしていない場合，Step2に戻る．
+	\item[Step5] すべての制約を満たし，
+	             目的関数$F^{\prime}$の値が最小である個体を選択し，
+	             第２段階のアルゴリズムを終了する．
+							 この個体が実行結果となる．
+\end{description}
+
+\section{平日での残業の割り当て}
+納期内に完了しないHPジョブを担当する作業者に対して，
+残業時間を最小化しつつ，
+作業者の希望に沿うよう平日の残業を割り当てるアルゴリズムについて説明する．
+このアルゴリズムを疑似コードとして以下のAlgorithm 1に示す．
+このアルゴリズムでは，
+すべての制約を満たす個体が存在しない場合，
+各個体における納期内に完了しないHPジョブの作業をランダムに選択し，
+さらに，その作業が行われる日付をランダムに選択する．
+このとき，休日である日付は選択されない．
+そして，その作業を担当する作業者に対して，
+その日付のシフトをあらかじめ定められた時間分増やす．
+上記の試行を試行回数が規定回数を満たすか，
+または各個体がすべての制約を満たすまで繰り返し行い，
+最後に，すべての制約を満たし，
+目的関数$F^{\prime}$の値が最小である個体を選択する．
+目的関数$F^{\prime}$の第3項で，
+シフトが作業者の希望に沿っていない場合に
+ペナルティ係数$H$を乗じた数値を加えているため，
+目的関数$F^{\prime}$の値が最小であることは
+シフトが作業者の希望に沿っていることを意味する．
+
+\begin{algorithm}
+	\caption{}
+	\label{alg1}
+	\begin{algorithmic}[1]
+		\setlength{\baselineskip}{19pt}
+		\REQUIRE 　\\
+				$X$：目的関数$F^{\prime}$の値が最小である個体群 \\
+		    $maxIter$：規定回数 \\
+				$ASG$：割り当てる残業時間
+    \ENSURE 　\\
+				$x_{best}$：最良解
+    \STATE 個体群$X$のサイズ$NP$を求める．
+		\STATE 個体群$X$の各個体$x_k \in X$におけるHPジョブの納期からの遅延期間$t_k$を求める．
+    \IF{$\min\limits_k t_k > 0$}
+		\STATE $iter \leftarrow 0$
+		 \FOR{$iter < maxIter$ \AND $\max\limits_k t_k > 0$}
+		 \STATE $k \leftarrow 0$
+		  \FOR{$k < NP$}
+		  \STATE $j \leftarrow 0$
+		   \FOR{$j < N_j$}
+       \STATE $t_{kj} \leftarrow$ 個体$x_k$におけるジョブ$j$の納期からの遅延期間
+		   \IF{$t_{kj} > 0$ \AND $P_j = HP $}
+		    \STATE ジョブ$j$の作業$i$をランダムに選択する．
+				\STATE $w \leftarrow w|_{x^w_ji = 1}$
+		    \STATE 日付$d \in D_{ji} \cap (D \setminus HD)$をランダムに選択する．
+				\IF{$wt^w_d \leq 960$}
+				 \STATE $wt^w_d \leftarrow wt^w_d + ASG$
+				\ENDIF
+		   \ENDIF
+		   \STATE $j \leftarrow j + 1$
+		  \ENDFOR
+			\STATE $t_k \leftarrow$ 個体$x_k$におけるHPジョブの納期からの遅延期間
+			\STATE $F^{\prime} \leftarrow$ 更新されたシフトの下で求めた目的関数$F^{\prime}$の値
+		  \STATE $k \leftarrow k + 1$
+     \ENDFOR
+		\STATE $iter \leftarrow iter + 1$
+		\ENDFOR
+    \ENDIF
+		\STATE $x_{best} \leftarrow$ $t_k = 0$であり，目的関数$F^{\prime}$の値が最小である個体
+		\RETURN $x_{best}$
+	\end{algorithmic}
+\end{algorithm}
 
 \chapter{実験結果と考察}
+本章では，第５章での解法を問題例に適用した結果とその考察について述べる．
+
+\section{問題例}
+
 
 \chapter{結言}
 
@@ -507,20 +636,17 @@ HPジョブが納期内に完了するよう作業者に残業を割り当てる
 \acknowledgement % 謝辞
 本研究を行うにあたり，研究課題の設定や研究に対する姿勢，本報告書の作成に
 至るまで，全ての面で丁寧なご指導を頂きました，本学情報工学・人間科学系 
-工繊一郎教授に厚く御礼申し上げます．
+飯間等准教授に厚く御礼申し上げます．
 貴重なデータをご提供頂きました，○○大学○○学部 ○○○○教授に深く
 感謝致します．
 本報告書執筆にあたり貴重な助言を多数頂きました，本学情報工学専攻
  ○○○○先輩，○○○○先輩，情報工学課程 ○○○○君，○○○○君を
-はじめとする，○○研究室の皆さん，学生生活を通じて著者の支えとなった
+はじめとする，情報知能システム研究室の皆さん，学生生活を通じて著者の支えとなった
 家族や友人に深く感謝致します．
 
 % 参考文献
 \bibliographystyle{kit-is} % 文献スタイルファイル
 \bibliography{sample_b} % 文献データベース
-
-\appendix % 付録
-\chapter{}
 
 \end{document}
 
