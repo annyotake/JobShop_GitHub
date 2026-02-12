@@ -15,7 +15,7 @@ using namespace std;
 #define HP 1
 #define LP 0
 #define MAX_TIME 525600 // one year
-#define input "input1.txt"
+#define input "input2.txt"
 
 class JobShop
 {
@@ -32,7 +32,7 @@ public:
     int H = 10000;  // penalty
     float standard_time = 540;
     vector<float> standard_shift = {480, 1020};
-    float overtime_assigned = 60;
+    float overtime_assigned = 30;
 
     struct Shift
     {
@@ -1282,7 +1282,7 @@ float JobShop::calc_overtime(vector<vector<Resource_asg>> x, int i)
         {
             if (d % 7 != 5 && d % 7 != 6)
             {
-                float temp = worker[x[i][j].worker_num].shifts[d].workingtime > standard_time;
+                float temp = worker[x[i][j].worker_num].shifts[d].workingtime - standard_time;
                 if (temp > 0)
                 {
                     overtime += temp;
@@ -1542,7 +1542,7 @@ void JobShop::adjust_shifts()
         {
             index.push_back(i);
             chromosomes_overdue_best.push_back(chromosomes_best[i]);
-            //cout << "overdue:" << overdue_HPs[i] << " F:" << chromosomes_best[i].F << endl;
+            // cout << "overdue:" << overdue_HPs[i] << " F:" << chromosomes_best[i].F << endl;
         }
     }
 
@@ -1577,13 +1577,38 @@ void JobShop::adjust_shifts()
     cout << "Shift of worker" << endl;
     for (int j = 0; j < worker_size; j++)
     {
-        cout << "worker" << j << ":";
+        cout << "worker" << j << ":" << endl;
         for (int d = 0; d < workingday; d++)
         {
-            cout << workers_adjusted[index[index_best]][j].shifts[d].shift[0] << " " << workers_adjusted[index[index_best]][j].shifts[d].shift[1] << "/";
+            cout << worker[j].shifts[d].shift[0] << " " << worker[j].shifts[d].shift[1] << "/";
         }
         cout << endl;
     }
+    cout << "Overtime of worker" << endl;
+    for (int j = 0; j < worker_size; j++)
+    {
+        cout << "worker" << j << ":" << endl;
+        for (int d = 0; d < workingday; d++)
+        {
+            if (d % 7 != 5 && d % 7 != 6)
+            {
+                cout << "DAY" << d << " available overtime:" << worker[j].shifts[d].overtime << " real overtime:" << worker[j].shifts[d].workingtime - standard_time << endl;
+            }
+            else
+            {
+                cout << "DAY" << d << " available overtime:" << worker[j].shifts[d].overtime << " real overtime:" << worker[j].shifts[d].workingtime << endl;
+            }
+        }
+        cout << endl;
+    }
+
+    float total_overtime = 0;
+    for (int j = 0; j < job_size; j++)
+    {
+        total_overtime += calc_overtime(chromosome_best.resource_asg, j);
+    }
+    cout << "Total overtime:" << total_overtime;
+    cout << endl;
 }
 
 vector<float> JobShop::calculate_overdue_HP(vector<Chromosome> x)
@@ -1730,7 +1755,7 @@ int main()
     auto end = chrono::high_resolution_clock::now();
 
     auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
-    cout << duration.count() << "ms\n";
+    cout << (double)duration.count() / 1000 << "s\n";
 
     return 0;
 }
