@@ -15,7 +15,7 @@ using namespace std;
 #define HP 1
 #define LP 0
 #define MAX_TIME 525600 // one year
-#define input "input2.txt"
+#define input "input3.txt"
 
 class JobShop
 {
@@ -1756,6 +1756,8 @@ int main()
 
     auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
     cout << (double)duration.count() / 1000 << "s\n";
+
+    //cout << __cplusplus << endl;
 
     return 0;
 }
